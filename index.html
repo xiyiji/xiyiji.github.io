@@ -1,0 +1,497 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Mengyun Wang — AI engineer working on evaluation and ML systems: calibration, offline evaluation, and measuring what breaks under distribution shift.">
+<meta name="author" content="Mengyun Wang">
+<meta name="theme-color" content="#E4E8EA" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0D1216" media="(prefers-color-scheme: dark)">
+<meta property="og:title" content="Mengyun Wang">
+<meta property="og:description" content="AI Engineer — evaluation and ML systems.">
+<meta property="og:type" content="profile">
+<meta property="og:url" content="https://xiyiji.github.io/">
+<link rel="canonical" href="https://xiyiji.github.io/">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#127919;</text></svg>">
+<style>*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}body{margin:0;padding:0}img{max-width:100%}</style>
+<title>Mengyun Wang</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..500&family=JetBrains+Mono:wght@400;500;700&display=swap">
+
+<style>
+:root{
+  --paper:#E4E8EA; --card:#F7F8F9; --card-2:#EDF1F3;
+  --ink:#0F151A; --ink-2:#323E48; --muted:#59656F; --faint:#8894A0;
+  --rule:#C8D0D6; --rule-soft:#D9E0E4;
+  --sig:#C81E5A; --sig-soft:rgba(200,30,90,.10); --sig-line:rgba(200,30,90,.32);
+  --s2:#1F6FB2; --s2-soft:rgba(31,111,178,.11);
+  --s3:#B4791A; --s3-soft:rgba(180,121,26,.12);
+  --noise:#98A3AE; --noise-soft:rgba(152,163,174,.20);
+  --good:#1C6B4B; --good-soft:rgba(28,107,75,.11);
+  --crit:#A32718; --crit-soft:rgba(163,39,24,.10);
+  --shadow:0 1px 1px rgba(15,21,26,.04), 0 10px 30px -22px rgba(15,21,26,.4);
+  --display:"Archivo","Helvetica Neue",Helvetica,Arial,sans-serif;
+  --body:"Newsreader",Georgia,"Times New Roman",serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#0D1216; --card:#151C22; --card-2:#1C242B;
+    --ink:#E5EAEF; --ink-2:#B7C2CB; --muted:#8D9AA6; --faint:#68757F;
+    --rule:#262F37; --rule-soft:#1E262D;
+    --sig:#EA4A80; --sig-soft:rgba(234,74,128,.14); --sig-line:rgba(234,74,128,.38);
+    --s2:#4090CC; --s2-soft:rgba(64,144,204,.15);
+    --s3:#B37D1C; --s3-soft:rgba(179,125,28,.17);
+    --noise:#5C6874; --noise-soft:rgba(92,104,116,.25);
+    --good:#4FB68A; --good-soft:rgba(79,182,138,.13);
+    --crit:#E0705C; --crit-soft:rgba(224,112,92,.12);
+    --shadow:0 1px 1px rgba(0,0,0,.5), 0 10px 30px -22px rgba(0,0,0,.9);
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0D1216; --card:#151C22; --card-2:#1C242B;
+  --ink:#E5EAEF; --ink-2:#B7C2CB; --muted:#8D9AA6; --faint:#68757F;
+  --rule:#262F37; --rule-soft:#1E262D;
+  --sig:#EA4A80; --sig-soft:rgba(234,74,128,.14); --sig-line:rgba(234,74,128,.38);
+  --s2:#4090CC; --s2-soft:rgba(64,144,204,.15);
+  --s3:#B37D1C; --s3-soft:rgba(179,125,28,.17);
+  --noise:#5C6874; --noise-soft:rgba(92,104,116,.25);
+  --good:#4FB68A; --good-soft:rgba(79,182,138,.13);
+  --crit:#E0705C; --crit-soft:rgba(224,112,92,.12);
+  --shadow:0 1px 1px rgba(0,0,0,.5), 0 10px 30px -22px rgba(0,0,0,.9);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--body);
+  font-size:17px;line-height:1.62;-webkit-font-smoothing:antialiased;font-optical-sizing:auto}
+::selection{background:var(--sig-soft);color:var(--ink)}
+:focus-visible{outline:2px solid var(--sig);outline-offset:3px;border-radius:3px}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;transition-duration:.001ms!important}}
+
+.wrap{max-width:880px;margin:0 auto;padding:0 26px 110px}
+h1,h2,h3,h4{font-family:var(--display);margin:0;letter-spacing:-.022em;font-weight:700;text-wrap:balance}
+h1{font-size:clamp(34px,6vw,50px);line-height:1.04;letter-spacing:-.04em;font-weight:800}
+h2{font-size:clamp(21px,2.8vw,27px);line-height:1.16}
+h3{font-size:17.5px;letter-spacing:-.014em}
+p{margin:0}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* section marker */
+.mk{display:flex;align-items:center;gap:11px;margin:0 0 20px}
+.mk span{font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--faint);white-space:nowrap}
+.mk::after{content:"";flex:1;height:1px;background:var(--rule)}
+
+/* ── header ── */
+header{padding:78px 0 0}
+.role{font-family:var(--mono);font-size:12.5px;letter-spacing:.03em;color:var(--sig);margin:14px 0 20px}
+.bio{font-size:18.5px;line-height:1.6;color:var(--ink-2);max-width:62ch;display:grid;gap:13px}
+.bio b{font-family:var(--display);font-weight:600;color:var(--ink)}
+.links{display:flex;gap:8px;flex-wrap:wrap;margin-top:24px}
+.links a{font-family:var(--display);font-size:12.5px;font-weight:600;text-decoration:none;
+  color:var(--ink-2);border:1px solid var(--rule);border-radius:6px;padding:7px 13px;
+  transition:color .16s,border-color .16s,transform .16s;background:var(--card)}
+.links a:hover{color:var(--sig);border-color:var(--sig);transform:translateY(-1px)}
+
+section{padding-top:66px}
+
+/* ── the toggle rig ── */
+.rig{border:1px solid var(--rule);border-radius:12px;background:var(--card);overflow:hidden;box-shadow:var(--shadow)}
+.rig-head{padding:18px 22px;border-bottom:1px solid var(--rule);display:flex;
+  justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+.seg{display:flex;gap:0;border:1px solid var(--rule);border-radius:8px;overflow:hidden;background:var(--card-2)}
+.seg button{font-family:var(--display);font-size:12.5px;font-weight:600;padding:8px 15px;border:0;
+  background:transparent;color:var(--muted);cursor:pointer;transition:background .18s,color .18s;line-height:1.3}
+.seg button.on{background:var(--sig);color:#fff}
+:root[data-theme="dark"] .seg button.on{color:#11171C}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .seg button.on{color:#11171C}}
+.seg button:not(.on):hover{color:var(--ink)}
+.rig-sub{font-family:var(--mono);font-size:11px;color:var(--muted)}
+
+.grid4{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--rule-soft)}
+@media(min-width:720px){.grid4{grid-template-columns:repeat(4,1fr)}}
+.cell{background:var(--card);padding:17px 18px;display:flex;flex-direction:column;gap:4px;min-height:112px}
+.cell .n{font-family:var(--display);font-size:clamp(25px,3.4vw,31px);font-weight:700;line-height:1;
+  letter-spacing:-.035em;font-variant-numeric:tabular-nums;transition:color .25s}
+.cell .l{font-family:var(--display);font-size:11.5px;font-weight:600;color:var(--ink);line-height:1.25}
+.cell .d{font-size:12.5px;color:var(--muted);line-height:1.4}
+.chip{display:inline-flex;align-items:center;gap:4px;font-family:var(--mono);font-size:9px;
+  letter-spacing:.09em;text-transform:uppercase;padding:2px 7px;border-radius:20px;
+  border:1px solid currentColor;width:fit-content;margin-top:2px}
+.chip.hold{color:var(--good);background:var(--good-soft)}
+.chip.break{color:var(--crit);background:var(--crit-soft)}
+
+.verdict{padding:16px 22px;border-top:1px solid var(--rule);background:var(--card-2);
+  font-size:15px;line-height:1.55;color:var(--ink-2)}
+.verdict b{font-family:var(--display);font-weight:700;color:var(--ink)}
+
+/* ── charts ── */
+.plot{width:100%;display:block;overflow:visible}
+.plot text{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.gridline{stroke:var(--rule-soft);stroke-width:1}
+.ax{stroke:var(--rule);stroke-width:1}
+.axlab{fill:var(--faint);font-size:9.5px}
+.scroller{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.legend{display:flex;gap:15px;flex-wrap:wrap;align-items:center;margin-bottom:13px}
+.lg{display:flex;gap:6px;align-items:center;font-family:var(--display);font-size:12px;font-weight:500;color:var(--ink-2)}
+.sw{width:11px;height:11px;border-radius:2.5px;flex:none}
+
+.card{border:1px solid var(--rule);border-radius:12px;background:var(--card);padding:20px 22px;box-shadow:var(--shadow)}
+@media(max-width:560px){.card{padding:16px 14px}}
+.card-h{display:flex;justify-content:space-between;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+.note{font-size:14.5px;line-height:1.55;color:var(--muted);max-width:70ch;margin-top:12px}
+.note b{font-family:var(--display);color:var(--ink);font-weight:600}
+
+/* ── matrix ── */
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:9px 12px 9px 0;border-bottom:1px solid var(--rule-soft)}
+th{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--faint);font-weight:400;white-space:nowrap}
+td{font-family:var(--body);color:var(--ink-2)}
+td.num,th.num{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;padding-right:0}
+td b{font-family:var(--display);font-weight:600;color:var(--ink)}
+.gate{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.08em;padding:2px 7px;border-radius:4px}
+.gate.ship{color:var(--good);background:var(--good-soft)}
+.gate.rej{color:var(--crit);background:var(--crit-soft)}
+
+/* ── work entries ── */
+.work{display:grid;gap:13px}
+a.entry{display:block;text-decoration:none;border:1px solid var(--rule);border-radius:12px;
+  background:var(--card);padding:20px 22px;transition:transform .17s,box-shadow .17s,border-color .17s;box-shadow:var(--shadow)}
+a.entry:hover{transform:translateY(-2px);border-color:var(--sig);box-shadow:0 2px 4px rgba(0,0,0,.06),0 18px 40px -26px rgba(0,0,0,.5)}
+.entry-top{display:flex;justify-content:space-between;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:7px}
+.entry h3{color:var(--ink)}
+.entry .venue{font-family:var(--mono);font-size:10.5px;color:var(--sig);letter-spacing:.05em}
+.entry p{font-size:15px;line-height:1.55;color:var(--ink-2);max-width:70ch}
+.facts{display:flex;gap:7px;flex-wrap:wrap;margin-top:11px}
+.fact{font-family:var(--mono);font-size:10.5px;color:var(--muted);border:1px solid var(--rule);
+  border-radius:5px;padding:3px 8px;background:var(--card-2)}
+.fact b{color:var(--ink);font-weight:700}
+
+footer{margin-top:72px;padding-top:20px;border-top:1px solid var(--rule)}
+footer p{font-family:var(--mono);font-size:10.5px;line-height:1.75;color:var(--faint);max-width:86ch}
+footer b{color:var(--muted);font-weight:500}
+
+.tip{position:fixed;pointer-events:none;z-index:60;background:var(--ink);color:var(--paper);
+  padding:8px 11px;border-radius:7px;font-family:var(--mono);font-size:11px;line-height:1.5;
+  box-shadow:0 6px 22px rgba(0,0,0,.3);opacity:0;transition:opacity .12s;max-width:250px}
+.tip.on{opacity:1}
+.tip .hd{font-family:var(--display);font-size:12px;font-weight:700;display:block;margin-bottom:3px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Mengyun&nbsp;Wang</h1>
+  <p class="role">AI Engineer &nbsp;·&nbsp; evaluation and ML systems</p>
+  <div class="bio">
+    <p>I work on the part of machine learning that decides whether a model is actually
+    fit to ship: <b>calibration, offline evaluation, and measuring what breaks when the
+    data a model sees in production stops looking like the data it was trained on.</b></p>
+    <p>Most recently I used two weeks of Kuaishou logs — where uniformly random videos were
+    injected into live recommendation feeds — to measure what exposure bias really costs.
+    The answer turned out to be asymmetric, and it overturned a conclusion I had published
+    myself.</p>
+  </div>
+  <div class="links">
+    <a href="https://github.com/xiyiji" target="_blank" rel="noopener">GitHub</a>
+    <a href="https://github.com/PSCRedefine" target="_blank" rel="noopener">Projects</a>
+    <a href="mailto:btzdnsn@gmail.com">Email</a>
+  </div>
+</header>
+
+<section id="finding">
+  <div class="mk"><span>Selected finding</span></div>
+  <h2 style="margin-bottom:12px">Ranking survives randomized exposure.<br>Calibration collapses.</h2>
+  <p style="font-size:17px;line-height:1.6;color:var(--ink-2);max-width:64ch;margin-bottom:22px">
+  A recommender only ever logs what it chose to show, so every offline number is measured on
+  traffic the model helped select. Kuaishou's randomized slice gives an unbiased comparison over
+  the <b style="font-family:var(--display);font-weight:600;color:var(--ink)">identical two-week
+  window</b> — so any gap is the exposure mechanism, not drift. <b style="font-family:var(--display);font-weight:600;color:var(--ink)">Switch
+  the exposure below</b> and watch which metrics move.</p>
+
+  <div class="rig">
+    <div class="rig-head">
+      <div class="seg" role="group" aria-label="Exposure mechanism">
+        <button type="button" id="btnA" class="on">Algorithmic</button>
+        <button type="button" id="btnB">Uniform random</button>
+      </div>
+      <span class="rig-sub" id="rigSub">295,497 rows · 22 Apr – 8 May</span>
+    </div>
+
+    <div class="grid4">
+      <div class="cell">
+        <div class="n mono" id="mAuc">0.8811</div>
+        <div class="l">Ranking quality</div>
+        <div class="d">ROC-AUC</div>
+        <span class="chip hold" id="chipAuc">holds</span>
+      </div>
+      <div class="cell">
+        <div class="n mono" id="mLift">3.43×</div>
+        <div class="l">Lift at top 23.9%</div>
+        <div class="d">vs contacting at random</div>
+        <span class="chip hold" id="chipLift">holds</span>
+      </div>
+      <div class="cell">
+        <div class="n mono" id="mRatio">0.96×</div>
+        <div class="l">Predicted ÷ actual</div>
+        <div class="d">1.00× would be honest</div>
+        <span class="chip hold" id="chipRatio">calibrated</span>
+      </div>
+      <div class="cell">
+        <div class="n mono" id="mEce">0.0028</div>
+        <div class="l">Calibration error</div>
+        <div class="d">lower is better</div>
+        <span class="chip hold" id="chipEce">holds</span>
+      </div>
+    </div>
+
+    <div class="verdict" id="verdict">
+      This is the traffic the recommender actually served. The model is well calibrated here —
+      it predicts engagement at almost exactly the rate that occurs.
+    </div>
+  </div>
+
+  <p class="note"><b>Why it matters.</b> Ranking transfers almost perfectly: lift falls only
+  <span class="mono">2.0%</span> when exposure becomes random. But mean predicted probability goes
+  from <span class="mono">0.96×</span> actual to <span class="mono">2.07×</span> — the model is
+  twice as confident as reality on traffic it did not select. A team validating offline would see
+  the ranking hold and conclude the model transfers. The probabilities would be silently wrong,
+  and every budget computed from them wrong with it.</p>
+</section>
+
+<section id="lift">
+  <div class="mk"><span>Where the ranking holds</span></div>
+  <div class="card">
+    <div class="card-h">
+      <h3>Lift by audience slice, both exposures</h3>
+      <div class="legend" style="margin-bottom:0">
+        <span class="lg"><span class="sw" style="background:var(--s2)"></span>Algorithmic</span>
+        <span class="lg"><span class="sw" style="background:var(--sig)"></span>Uniform random</span>
+      </div>
+    </div>
+    <div class="scroller">
+      <svg class="plot" id="liftPlot" viewBox="0 0 660 290" role="img"
+           aria-label="Lift over each split's own base rate, at five audience depths, for algorithmic and random exposure. The two curves track closely."></svg>
+    </div>
+    <p class="note">Each bar is measured against <em>that split's own</em> base rate, which differ by
+    <span class="mono">3.80×</span>. The curves track closely at every depth — the ordering the model
+    produces is real, not an artefact of what the recommender chose to show. At the very top of the
+    ranking the random slice scores <em>higher</em>, because it contains genuinely hard-to-reach users
+    the production policy would never have surfaced.</p>
+  </div>
+</section>
+
+<section id="cal">
+  <div class="mk"><span>Where it breaks</span></div>
+  <h2 style="margin-bottom:12px">No single calibrator fixes both</h2>
+  <p style="font-size:17px;line-height:1.6;color:var(--ink-2);max-width:64ch;margin-bottom:20px">
+  The obvious repair: fit a calibrator on nine days of randomized logs, apply it forward to eight
+  held-out days. Fit and evaluation never share a day. It works — and then it breaks the traffic
+  you actually serve.</p>
+
+  <div class="card">
+    <div class="card-h"><h3>Same calibrators, two exposure policies</h3>
+      <span class="rig-sub">Brier gate decides ship / reject</span></div>
+    <div class="scroller"><table id="calTable"><thead><tr>
+      <th>Calibrator</th>
+      <th class="num">Random traffic<br><span style="text-transform:none;letter-spacing:0">pred ÷ actual</span></th>
+      <th class="num">Gate</th>
+      <th class="num">Served traffic<br><span style="text-transform:none;letter-spacing:0">pred ÷ actual</span></th>
+      <th class="num">Gate</th>
+    </tr></thead><tbody></tbody></table></div>
+    <p class="note"><b>Calibration is a property of the exposure policy, not of the model.</b>
+    The correction that fixes randomized traffic breaks served traffic by almost exactly the same
+    factor in the other direction. Notably the Brier gate catches this on its own — adopted in an
+    earlier project for an unrelated reason, it ships on one distribution and rejects on the other
+    with no special-casing.</p>
+  </div>
+</section>
+
+<section id="work">
+  <div class="mk"><span>Selected work</span></div>
+  <div class="work">
+    <a class="entry" href="https://github.com/PSCRedefine" target="_blank" rel="noopener">
+      <div class="entry-top"><h3>Cognitive Shorts</h3><span class="venue">Four deployable services</span></div>
+      <p>An engagement prediction system taken from notebook to something operable: a leakage-safe
+      feature pipeline, cost-aware model selection under a paired-bootstrap tie test, and an operating
+      point chosen against a traffic budget rather than by maximising F1 — then model introspection and
+      drift monitoring built around it. Docker images running as non-root, per-row fault isolation so
+      one bad row never fails a batch, and traceability documents mapping every requirement to its
+      implementation and evidence.</p>
+      <div class="facts">
+        <span class="fact"><b>292</b> tests</span>
+        <span class="fact"><b>4</b> services</span>
+        <span class="fact">CI on <b>3</b> Python versions</span>
+        <span class="fact">shipped model <b>1,958×</b> smaller</span>
+      </div>
+    </a>
+
+    <a class="entry" href="https://github.com/PSCRedefine/kuairand-lab" target="_blank" rel="noopener">
+      <div class="entry-top"><h3>KuaiRand Lab</h3><span class="venue">Real Kuaishou logs</span></div>
+      <p>Three experiments on unbiased offline evaluation, using the discipline above against real
+      randomized-exposure data. Measures what exposure bias costs, shows that ranking transfers while
+      calibration does not, and demonstrates that no single calibrator serves both traffic types.
+      Every figure is written to a committed JSON artefact by the script that computes it.</p>
+      <div class="facts">
+        <span class="fact">ROC-AUC <b>0.8811</b></span>
+        <span class="fact">lift <b>3.43×</b></span>
+        <span class="fact"><b>2.6M</b> interactions</span>
+        <span class="fact"><b>51/51</b> figures reproduce</span>
+      </div>
+    </a>
+  </div>
+  <p class="note">The lab was built to test a limitation Cognitive Shorts had published about
+  itself — that its offline lift was never validated against a randomized holdout. It also corrected
+  that project's headline: a measured ceiling of 0.58 ROC-AUC turned out to be a property of the
+  synthetic data's corrupted joins, not of the problem. On real logs a single feature reaches
+  <span class="mono">0.7486</span>.</p>
+</section>
+
+<footer>
+  <p><b>Provenance.</b> Every number on this page is read from a committed results file —
+  <span class="mono">results/01_signal_probe.json</span>, <span class="mono">02_exposure_bias.json</span>,
+  <span class="mono">03_recalibrate.json</span> — produced by the script that computes it. Measured on
+  KuaiRand-Pure: 27,285 users and 7,583 videos over 8 Apr – 8 May 2022, comprising 1,436,609
+  algorithmically exposed interactions and a further 1,186,059 uniformly exposed ones.</p>
+  <p><b>Caveats.</b> One model, one seed; the bootstrap interval covers test sampling, not model
+  choice. Watch-duration features are treated as available at request time, matching the originating
+  service contract; in a pre-impression ranking setting they would not be, and every number here
+  would fall. Dataset: Gao et al., <em>KuaiRand</em>, CIKM 2022.</p>
+</footer>
+
+</div>
+<div class="tip" id="tip" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+"use strict";
+const D = {"exposure":{"a":{"label":"Algorithmic exposure","sub":"what the recommender chose to show","rows":295497,"base":0.021208337140478584,"auc":0.8811113093341751,"lift":3.428369851208739,"pr":0.28647835026142915,"ece":0.0028435627190030325,"pred":0.020374854419840206,"ratio":0.9607002324077742,"prbase":13.507817626807329},"b":{"label":"Uniform random exposure","sub":"videos injected at random into live feeds","rows":1186059,"base":0.005573921702040118,"auc":0.8638582190456497,"lift":3.362597707401883,"pr":0.14601270516226053,"ece":0.005977857981191042,"pred":0.011551779683231159,"ratio":2.072468954668502,"prbase":26.195686442602565},"gap":{"gap":0.017253090288525397,"ci_low":0.010958680915567804,"ci_high":0.024030496804439087,"n_bootstrap":200,"separable_from_zero":true},"lift_transfer":{"a":3.428369851208739,"b":3.362597707401883,"overstated_pct":1.9559920493039007},"base_ratio":3.8049219695203282,"norm":{"a_algorithmic":{"pr":0.28647835026142915,"base":0.021208337140478584,"pr_over_base":13.507817626807329},"b_random":{"pr":0.14601270516226053,"base":0.005573921702040118,"pr_over_base":26.195686442602565},"raw_drop_pct":49.03185353133493,"normalised_ratio_b_over_a":1.9392982024435361},"ece_ratio":2.102242352961678},"lift_curve":[{"k":0.01,"a":22.314649096907324,"b":30.677671865302937},{"k":0.05,"a":9.810680893549618,"b":11.087758923567044},{"k":0.1,"a":6.350876470513048,"b":6.622346424438676},{"k":0.239,"a":3.428369851208739,"b":3.362597707401883},{"k":0.5,"a":1.8937354656103733,"b":1.8215111409711813}],"cal":{"scalar":0.5011746864197928,"eval":{"none":{"pred_over_actual":2.1107678715644322,"ece":0.0062481665073931625,"brier":0.005575317163266665,"auc":0.8639139804558482,"lift":3.363966289843937,"brier_gate":"\u2014"},"scalar":{"pred_over_actual":1.057863426136278,"ece":0.000510356525725301,"brier":0.005156273817950855,"auc":0.8639139804558482,"lift":3.363966289843937,"brier_gate":"SHIP"},"platt":{"pred_over_actual":1.0539077718728642,"ece":0.0003087798153493394,"brier":0.005154788253056694,"auc":0.8639139804558482,"lift":3.363966289843937,"brier_gate":"SHIP"},"isotonic":{"pred_over_actual":1.0543765089503387,"ece":0.0003101084221336183,"brier":0.005154085746114333,"auc":0.8631074249183228,"lift":3.363966289843937,"brier_gate":"SHIP"}},"eval_rows":785410,"eval_base":0.005625087533899492,"side":{"none":{"pred_over_actual":0.9607002324077742,"ece":0.0028435627190030325,"brier":0.0175419761122068,"auc":0.8811113093341751,"lift":3.428369851208739,"brier_gate":"\u2014"},"scalar":{"pred_over_actual":0.4814786377203883,"ece":0.01099697586576624,"brier":0.018257685517735153,"auc":0.8811113093341751,"lift":3.428369851208739,"brier_gate":"reject"},"platt":{"pred_over_actual":0.48873696766142677,"ece":0.010843038757299868,"brier":0.018047503800451628,"auc":0.8811113093341751,"lift":3.428369851208739,"brier_gate":"reject"},"isotonic":{"pred_over_actual":0.49116972197462394,"ece":0.010791444083645622,"brier":0.018053460672752476,"auc":0.880313756932766,"lift":3.396322771781666,"brier_gate":"reject"}},"side_rows":295497,"side_base":0.021208337140478584,"ece_gain":{"none":1.0,"scalar":12.242748338553103,"platt":20.235022487866548,"isotonic":20.148328976053985}},"probe":{"n_signal":24,"n_total":37,"best":"watch_ratio","best_auc":0.7485526353894544,"top":[{"n":"watch_ratio","auc":0.7485526353894544,"sig":true},{"n":"play_time_ms","auc":0.72874754398549,"sig":true},{"n":"onehot_feat1","auc":0.6278709027005609,"sig":true},{"n":"tag","auc":0.6062113549718358,"sig":true},{"n":"register_days","auc":0.41622058959917185,"sig":true},{"n":"tab","auc":0.5710939387094961,"sig":true},{"n":"friend_user_num","auc":0.5709851540354324,"sig":true},{"n":"duration_ms","auc":0.42958497256991957,"sig":true},{"n":"video_duration","auc":0.4365859323893814,"sig":true},{"n":"user_active_degree","auc":0.5513399621995787,"sig":true}],"fingerprint":{"double_click_cnt":0.6328126732693726,"like_cnt":0.6281835025042225,"play_cnt":0.5049193780796148,"show_cnt":0.5031207841650668},"n_agg":50},"data":{"users":27285,"videos":7583,"logged":1436609,"random":1186059,"train_rows":1141112}};
+const NS="http://www.w3.org/2000/svg";
+const el=(n,a)=>{const e=document.createElementNS(NS,n);for(const k in a)e.setAttribute(k,a[k]);return e;};
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const comma=n=>Math.round(n).toLocaleString("en-US");
+
+const tip=document.getElementById("tip");let tipOn=false;
+function showTip(e,h){tip.innerHTML=h;tip.classList.add("on");tipOn=true;moveTip(e);}
+function moveTip(e){if(!tipOn)return;const r=tip.getBoundingClientRect();
+  let x=e.clientX+15,y=e.clientY+15;
+  if(x+r.width>innerWidth-10)x=e.clientX-r.width-15;
+  if(y+r.height>innerHeight-10)y=e.clientY-r.height-15;
+  tip.style.left=Math.max(8,x)+"px";tip.style.top=Math.max(8,y)+"px";}
+function hideTip(){tip.classList.remove("on");tipOn=false;}
+addEventListener("scroll",hideTip,{passive:true});
+function hover(n,h){n.addEventListener("mouseenter",e=>showTip(e,h));
+  n.addEventListener("mousemove",moveTip);n.addEventListener("mouseleave",hideTip);}
+
+/* ── exposure toggle ── */
+const E=D.exposure, btnA=document.getElementById("btnA"), btnB=document.getElementById("btnB");
+const F={auc:document.getElementById("mAuc"),lift:document.getElementById("mLift"),
+  ratio:document.getElementById("mRatio"),ece:document.getElementById("mEce")};
+const C={auc:document.getElementById("chipAuc"),lift:document.getElementById("chipLift"),
+  ratio:document.getElementById("chipRatio"),ece:document.getElementById("chipEce")};
+
+function chip(node,ok,text){node.className="chip "+(ok?"hold":"break");node.textContent=text;}
+
+function render(which){
+  const d = which==="a"?E.a:E.b, isA = which==="a";
+  F.auc.textContent  = d.auc.toFixed(4);
+  F.lift.textContent = d.lift.toFixed(2)+"×";
+  F.ratio.textContent= d.ratio.toFixed(2)+"×";
+  F.ece.textContent  = d.ece.toFixed(4);
+
+  // ranking metrics hold on both; calibration only on served traffic
+  F.auc.style.color = css("--ink");
+  F.lift.style.color = css("--ink");
+  F.ratio.style.color = isA ? css("--good") : css("--crit");
+  F.ece.style.color = isA ? css("--ink") : css("--crit");
+
+  chip(C.auc,true, isA?"baseline":"−0.017 · holds");
+  chip(C.lift,true, isA?"baseline":"−2.0% · transfers");
+  chip(C.ratio,isA,isA?"calibrated":"2× overconfident");
+  chip(C.ece,isA,isA?"baseline":"2.1× worse");
+
+  document.getElementById("rigSub").textContent =
+    comma(d.rows)+" rows · base "+(d.base*100).toFixed(2)+"% · 22 Apr – 8 May";
+
+  document.getElementById("verdict").innerHTML = isA
+    ? "This is the traffic the recommender actually served. The model is well calibrated here — "
+      + "it predicts engagement at almost exactly the rate that occurs."
+    : "Same model, same window, exposure chosen at random. <b>Ranking barely moves. "
+      + "Calibration doubles.</b> Engagement runs " + E.base_ratio.toFixed(2)
+      + "× higher under algorithmic exposure, and the model carries that inflation into its "
+      + "probabilities — predicting " + E.b.ratio.toFixed(2) + "× the rate that actually occurs.";
+
+  btnA.classList.toggle("on",isA); btnB.classList.toggle("on",!isA);
+}
+btnA.addEventListener("click",()=>render("a"));
+btnB.addEventListener("click",()=>render("b"));
+
+/* ── lift curve ── */
+function drawLift(){
+  const svg=document.getElementById("liftPlot"); svg.textContent="";
+  const L=D.lift_curve, n=L.length;
+  const W=660,H=290,PL=46,PR=18,PT=22,PB=52;
+  const pw=W-PL-PR, ph=H-PT-PB, maxV=32;
+  const Y=v=>PT+(1-v/maxV)*ph, slot=pw/n;
+
+  [0,8,16,24,32].forEach(v=>{
+    svg.appendChild(el("line",{x1:PL,y1:Y(v),x2:PL+pw,y2:Y(v),class:"gridline"}));
+    const t=el("text",{x:PL-9,y:Y(v)+3.5,class:"axlab","text-anchor":"end"});
+    t.textContent=v+"×"; svg.appendChild(t);
+  });
+  svg.appendChild(el("line",{x1:PL,y1:Y(1),x2:PL+pw,y2:Y(1),stroke:"var(--ink)",
+    "stroke-width":1.2,"stroke-dasharray":"4 3"}));
+  const bl=el("text",{x:PL+pw,y:Y(1)-6,class:"axlab","text-anchor":"end",fill:css("--ink"),"font-size":"9.5"});
+  bl.textContent="1× = no better than random"; svg.appendChild(bl);
+
+  L.forEach((d,i)=>{
+    const x0=PL+i*slot, bw=(slot-18)/2;
+    [["a",d.a,"var(--s2)"],["b",d.b,"var(--sig)"]].forEach(([k,v,col],j)=>{
+      const x=x0+7+j*(bw+2);   // 2px surface gap between the pair
+      const g=el("g");
+      g.appendChild(el("rect",{x:x0,y:PT,width:slot,height:ph,fill:"transparent"}));
+      g.appendChild(el("rect",{x,y:Y(v),width:bw,height:Y(0)-Y(v),rx:4,fill:col}));
+      hover(g,"<span class='hd'>Top "+(d.k*100).toFixed(d.k<0.1?0:1)+"% of the audience</span>"
+        +"algorithmic <b>"+d.a.toFixed(2)+"×</b><br>random <b>"+d.b.toFixed(2)+"×</b><br>"
+        +"gap <b>"+((d.b/d.a-1)*100).toFixed(1)+"%</b>");
+      svg.appendChild(g);
+    });
+    const t=el("text",{x:x0+slot/2,y:H-PB+18,class:"axlab","text-anchor":"middle","font-size":"10"});
+    t.textContent="top "+(d.k*100).toFixed(d.k<0.1?0:1)+"%"; svg.appendChild(t);
+  });
+  const xl=el("text",{x:PL+pw/2,y:H-8,class:"axlab","text-anchor":"middle"});
+  xl.textContent="lift over that split's own base rate"; svg.appendChild(xl);
+}
+
+/* ── calibrator matrix ── */
+const NICE={none:"None (raw model)",scalar:"Scalar",platt:"Platt",isotonic:"Isotonic"};
+function fillTable(){
+  const tb=document.querySelector("#calTable tbody");
+  ["none","scalar","platt","isotonic"].forEach(k=>{
+    const e=D.cal.eval[k], s=D.cal.side[k];
+    const g=v=>v.brier_gate==="SHIP"?"<span class='gate ship'>SHIP</span>"
+      :v.brier_gate==="reject"?"<span class='gate rej'>REJECT</span>"
+      :"<span style='color:var(--faint)'>—</span>";
+    const tr=document.createElement("tr");
+    tr.innerHTML="<td><b>"+NICE[k]+"</b></td>"
+      +"<td class='num'>"+e.pred_over_actual.toFixed(3)+"×</td>"
+      +"<td class='num'>"+g(e)+"</td>"
+      +"<td class='num'>"+s.pred_over_actual.toFixed(3)+"×</td>"
+      +"<td class='num'>"+g(s)+"</td>";
+    tb.appendChild(tr);
+  });
+}
+
+function boot(){render("a");drawLift();fillTable();}
+if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",boot,{once:true});
+else boot();
+
+const mq=matchMedia("(prefers-color-scheme: dark)");
+const redraw=()=>{drawLift();render(btnA.classList.contains("on")?"a":"b");};
+mq.addEventListener?mq.addEventListener("change",redraw):mq.addListener(redraw);
+new MutationObserver(redraw).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+})();
+</script>
+</body>
+</html>
