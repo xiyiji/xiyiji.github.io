@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cognitive Shorts — Mengyun Wang</title>
+<meta name="description" content="Four deployable services around one engagement model.">
+<meta name="theme-color" content="#faf9f6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f0f17" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#127919;</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&family=LXGW+WenKai+TC:wght@400;700&display=swap">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<div class="wrap">
+<div class="page-head">
+  <a class="backlink" href="../"><span class="arw">←</span> Mengyun Wang</a>
+  <h1 style="font-size:clamp(28px,4.6vw,38px)">Cognitive Shorts</h1>
+  <p class="page-sub">Four deployable services &nbsp;·&nbsp; <a href="https://github.com/PSCRedefine" target="_blank" rel="noopener">source →</a></p>
+</div>
+
+<section style="padding-top:34px">
+  <div class="prose">
+    <p>An engagement prediction system taken from notebook to something operable, as four
+    deployable FastAPI services: a leakage-safe feature pipeline, cost-aware model selection
+    under a paired-bootstrap tie test, an operating point chosen against a traffic budget
+    rather than by maximising F1, then model introspection and drift monitoring around it.</p>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="n">292</div><div class="l">tests, across four repos</div></div>
+    <div class="stat"><div class="n">1,958×</div><div class="l">smaller shipped model</div></div>
+    <div class="stat"><div class="n">23<span style="font-size:.6em;color:var(--text-muted)">/25</span></div><div class="l">features measured out as noise</div></div>
+    <div class="stat"><div class="n">3</div><div class="l">Python versions in CI</div></div>
+  </div>
+</section>
+
+<section>
+  <h2 class="section-title">The four services</h2>
+  <div class="scroller"><table>
+    <thead><tr><th>#</th><th>Service</th><th>The question it answers</th><th class="num">Tests</th></tr></thead>
+    <tbody>
+      <tr><td>01</td><td><b><a href="https://github.com/PSCRedefine/SinglePrediction">Single Prediction</a></b></td><td>Is the model right?</td><td class="num">43</td></tr>
+      <tr><td>02</td><td><b><a href="https://github.com/PSCRedefine/BatchPrediction">Batch Prediction</a></b></td><td>Does it hold up at volume?</td><td class="num">78</td></tr>
+      <tr><td>03</td><td><b><a href="https://github.com/PSCRedefine/ModelInfo">Model Info</a></b></td><td>Is the artefact in memory the one that shipped?</td><td class="num">70</td></tr>
+      <tr><td>04</td><td><b><a href="https://github.com/PSCRedefine/AnalyticsDashboard">Analytics Dashboard</a></b></td><td>Is it still healthy today?</td><td class="num">101</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <h2 class="section-title">Notes</h2>
+  <!-- 脚手架提示（不渲染）：
+待填这一栏留给你想展开讲的部分 —— 比如那个阈值 bug（模型最大输出 0.389，
+    永远碰不到默认阈值 0.5，F1 = 0.0），或者四个模型统计打平后用成本破局的过程。
+    写好告诉我，我来排版。
+-->
+</section>
+
+<footer>
+  <p>Source at <a href="https://github.com/xiyiji/xiyiji.github.io">xiyiji/xiyiji.github.io</a>.</p>
+</footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KuaiRand Lab — Mengyun Wang</title>
+<meta name="description" content="Unbiased offline evaluation on real Kuaishou logs: ranking survives randomized exposure, calibration does not.">
+<meta name="theme-color" content="#faf9f6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f0f17" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#127919;</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&family=LXGW+WenKai+TC:wght@400;700&display=swap">
+<link rel="stylesheet" href="../assets/style.css">
+<style>
+.rig{border:1px solid var(--rule);border-radius:11px;background:var(--bg-card);
+  overflow:hidden;box-shadow:var(--shadow);margin:22px 0}
+.rig-head{padding:15px 18px;border-bottom:1px solid var(--rule);display:flex;
+  justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
+.seg{display:flex;border:1px solid var(--rule);border-radius:7px;overflow:hidden;background:var(--bg-sunk)}
+.seg button{font-family:var(--body);font-size:13px;font-weight:500;padding:7px 14px;border:0;
+  background:transparent;color:var(--text-muted);cursor:pointer;transition:background .18s,color .18s}
+.seg button.on{background:var(--accent);color:#fff}
+.seg button:not(.on):hover{color:var(--text)}
+.rig-sub{font-family:var(--mono);font-size:11px;color:var(--text-muted)}
+.grid4{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--rule-soft)}
+@media(min-width:660px){.grid4{grid-template-columns:repeat(4,1fr)}}
+.cell{background:var(--bg-card);padding:15px 16px;display:flex;flex-direction:column;gap:4px;min-height:104px}
+.cell .n{font-family:var(--display);font-size:27px;font-weight:700;line-height:1;
+  letter-spacing:-.03em;font-variant-numeric:tabular-nums;transition:color .25s}
+.cell .l{font-size:12.5px;font-weight:600;color:var(--text);line-height:1.25}
+.cell .d{font-size:12px;color:var(--text-muted);line-height:1.4}
+.chip{display:inline-flex;font-family:var(--mono);font-size:9px;letter-spacing:.08em;
+  text-transform:uppercase;padding:2px 7px;border-radius:20px;border:1px solid currentColor;
+  width:fit-content;margin-top:2px}
+.chip.hold{color:var(--good);background:var(--good-soft)}
+.chip.break{color:var(--crit);background:var(--crit-soft)}
+.verdict{padding:15px 18px;border-top:1px solid var(--rule);background:var(--bg-sunk);
+  font-size:14.5px;line-height:1.55;color:var(--text-secondary)}
+.verdict b{color:var(--text);font-weight:600}
+.plot{width:100%;display:block;overflow:visible}
+.plot text{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.gridline{stroke:var(--rule-soft);stroke-width:1}
+.axlab{fill:var(--text-muted);font-size:9.5px}
+.legend{display:flex;gap:15px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.lg{display:flex;gap:6px;align-items:center;font-size:12.5px;color:var(--text-secondary)}
+.sw{width:11px;height:11px;border-radius:2.5px;flex:none}
+.card{border:1px solid var(--rule);border-radius:11px;background:var(--bg-card);
+  padding:19px 20px;box-shadow:var(--shadow);margin:22px 0}
+.note{font-size:14px;line-height:1.6;color:var(--text-muted);max-width:68ch;margin-top:12px}
+.note b{color:var(--text);font-weight:600}
+.gate{font-family:var(--mono);font-size:10px;font-weight:500;letter-spacing:.07em;
+  padding:2px 7px;border-radius:4px}
+.gate.ship{color:var(--good);background:var(--good-soft)}
+.gate.rej{color:var(--crit);background:var(--crit-soft)}
+.tip{position:fixed;pointer-events:none;z-index:60;background:var(--text);color:var(--bg);
+  padding:8px 11px;border-radius:7px;font-family:var(--mono);font-size:11px;line-height:1.5;
+  box-shadow:0 6px 22px rgba(0,0,0,.3);opacity:0;transition:opacity .12s;max-width:250px}
+.tip.on{opacity:1}
+.tip .hd{font-family:var(--body);font-size:12px;font-weight:600;display:block;margin-bottom:3px}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+<div class="page-head">
+  <a class="backlink" href="../"><span class="arw">←</span> Mengyun Wang</a>
+  <h1 style="font-size:clamp(28px,4.6vw,38px)">KuaiRand Lab</h1>
+  <p class="page-sub">Unbiased offline evaluation on real Kuaishou logs &nbsp;·&nbsp;
+    <a href="https://github.com/PSCRedefine/kuairand-lab" target="_blank" rel="noopener">source →</a></p>
+</div>
+
+<section style="padding-top:34px">
+  <div class="prose">
+    <p>A recommender only ever logs what it chose to show, so every offline number is measured
+    on traffic the model helped select. For two weeks Kuaishou injected uniformly random videos
+    into live feeds, which gives an unbiased comparison over the
+    <b>identical calendar window</b> — so any gap is the exposure mechanism, not drift.</p>
+    <p>The cost turns out to be <b>asymmetric</b>. Switch the exposure below and watch which
+    metrics move.</p>
+  </div>
+
+  <div class="rig">
+    <div class="rig-head">
+      <div class="seg" role="group" aria-label="Exposure mechanism">
+        <button type="button" id="btnA" class="on">Algorithmic</button>
+        <button type="button" id="btnB">Uniform random</button>
+      </div>
+      <span class="rig-sub" id="rigSub"></span>
+    </div>
+    <div class="grid4">
+      <div class="cell"><div class="n mono" id="mAuc"></div><div class="l">Ranking quality</div>
+        <div class="d">ROC-AUC</div><span class="chip hold" id="chipAuc"></span></div>
+      <div class="cell"><div class="n mono" id="mLift"></div><div class="l">Lift at top 23.9%</div>
+        <div class="d">vs contacting at random</div><span class="chip hold" id="chipLift"></span></div>
+      <div class="cell"><div class="n mono" id="mRatio"></div><div class="l">Predicted ÷ actual</div>
+        <div class="d">1.00× would be honest</div><span class="chip hold" id="chipRatio"></span></div>
+      <div class="cell"><div class="n mono" id="mEce"></div><div class="l">Calibration error</div>
+        <div class="d">lower is better</div><span class="chip hold" id="chipEce"></span></div>
+    </div>
+    <div class="verdict" id="verdict"></div>
+  </div>
+
+  <p class="note"><b>Why it matters.</b> Ranking transfers almost perfectly — lift falls only
+  2.0% when exposure becomes random. But mean predicted probability goes from 0.96× actual to
+  2.07×: the model is twice as confident as reality on traffic it did not select. A team
+  validating offline would watch the ranking hold, conclude the model transfers, and ship
+  probabilities that are silently wrong.</p>
+</section>
+
+<section>
+  <h2 class="section-title">Where the ranking holds</h2>
+  <div class="card">
+    <div class="legend">
+      <span class="lg"><span class="sw" style="background:var(--accent)"></span>Algorithmic</span>
+      <span class="lg"><span class="sw" style="background:var(--crit)"></span>Uniform random</span>
+    </div>
+    <div class="scroller">
+      <svg class="plot" id="liftPlot" viewBox="0 0 660 290" role="img"
+        aria-label="Lift over each split's own base rate at five audience depths, for both exposure mechanisms."></svg>
+    </div>
+    <p class="note">Each bar is measured against <em>that split's own</em> base rate, which differ
+    by 3.80×. The curves track closely at every depth — the ordering the model produces is real,
+    not an artefact of what the recommender chose to show.</p>
+  </div>
+</section>
+
+<section>
+  <h2 class="section-title">Where it breaks</h2>
+  <div class="card">
+    <div class="scroller"><table id="calTable"><thead><tr>
+      <th>Calibrator</th><th class="num">Random traffic</th><th class="num">Gate</th>
+      <th class="num">Served traffic</th><th class="num">Gate</th>
+    </tr></thead><tbody></tbody></table></div>
+    <p class="note"><b>Calibration is a property of the exposure policy, not of the model.</b>
+    Fit a calibrator on nine days of randomized logs and apply it forward: it ships on randomized
+    traffic and is rejected on served traffic, by almost exactly the same factor in the other
+    direction. The Brier gate catches this on its own, with no special-casing.</p>
+  </div>
+</section>
+
+<footer>
+  <p>Every figure is read from a committed results file in
+  <a href="https://github.com/PSCRedefine/kuairand-lab">the repository</a>.
+  Dataset: Gao et al., <em>KuaiRand</em>, CIKM 2022.
+  One model, one seed; watch-duration features treated as available at request time.</p>
+</footer>
+
+</div>
+<div class="tip" id="tip" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+"use strict";
+const D = {"exposure":{"a":{"label":"Algorithmic exposure","sub":"what the recommender chose to show","rows":295497,"base":0.021208337140478584,"auc":0.8811113093341751,"lift":3.428369851208739,"pr":0.28647835026142915,"ece":0.0028435627190030325,"pred":0.020374854419840206,"ratio":0.9607002324077742,"prbase":13.507817626807329},"b":{"label":"Uniform random exposure","sub":"videos injected at random into live feeds","rows":1186059,"base":0.005573921702040118,"auc":0.8638582190456497,"lift":3.362597707401883,"pr":0.14601270516226053,"ece":0.005977857981191042,"pred":0.011551779683231159,"ratio":2.072468954668502,"prbase":26.195686442602565},"gap":{"gap":0.017253090288525397,"ci_low":0.010958680915567804,"ci_high":0.024030496804439087,"n_bootstrap":200,"separable_from_zero":true},"lift_transfer":{"a":3.428369851208739,"b":3.362597707401883,"overstated_pct":1.9559920493039007},"base_ratio":3.8049219695203282,"norm":{"a_algorithmic":{"pr":0.28647835026142915,"base":0.021208337140478584,"pr_over_base":13.507817626807329},"b_random":{"pr":0.14601270516226053,"base":0.005573921702040118,"pr_over_base":26.195686442602565},"raw_drop_pct":49.03185353133493,"normalised_ratio_b_over_a":1.9392982024435361},"ece_ratio":2.102242352961678},"lift_curve":[{"k":0.01,"a":22.314649096907324,"b":30.677671865302937},{"k":0.05,"a":9.810680893549618,"b":11.087758923567044},{"k":0.1,"a":6.350876470513048,"b":6.622346424438676},{"k":0.239,"a":3.428369851208739,"b":3.362597707401883},{"k":0.5,"a":1.8937354656103733,"b":1.8215111409711813}],"cal":{"scalar":0.5011746864197928,"eval":{"none":{"pred_over_actual":2.1107678715644322,"ece":0.0062481665073931625,"brier":0.005575317163266665,"auc":0.8639139804558482,"lift":3.363966289843937,"brier_gate":"\u2014"},"scalar":{"pred_over_actual":1.057863426136278,"ece":0.000510356525725301,"brier":0.005156273817950855,"auc":0.8639139804558482,"lift":3.363966289843937,"brier_gate":"SHIP"},"platt":{"pred_over_actual":1.0539077718728642,"ece":0.0003087798153493394,"brier":0.005154788253056694,"auc":0.8639139804558482,"lift":3.363966289843937,"brier_gate":"SHIP"},"isotonic":{"pred_over_actual":1.0543765089503387,"ece":0.0003101084221336183,"brier":0.005154085746114333,"auc":0.8631074249183228,"lift":3.363966289843937,"brier_gate":"SHIP"}},"eval_rows":785410,"eval_base":0.005625087533899492,"side":{"none":{"pred_over_actual":0.9607002324077742,"ece":0.0028435627190030325,"brier":0.0175419761122068,"auc":0.8811113093341751,"lift":3.428369851208739,"brier_gate":"\u2014"},"scalar":{"pred_over_actual":0.4814786377203883,"ece":0.01099697586576624,"brier":0.018257685517735153,"auc":0.8811113093341751,"lift":3.428369851208739,"brier_gate":"reject"},"platt":{"pred_over_actual":0.48873696766142677,"ece":0.010843038757299868,"brier":0.018047503800451628,"auc":0.8811113093341751,"lift":3.428369851208739,"brier_gate":"reject"},"isotonic":{"pred_over_actual":0.49116972197462394,"ece":0.010791444083645622,"brier":0.018053460672752476,"auc":0.880313756932766,"lift":3.396322771781666,"brier_gate":"reject"}},"side_rows":295497,"side_base":0.021208337140478584,"ece_gain":{"none":1.0,"scalar":12.242748338553103,"platt":20.235022487866548,"isotonic":20.148328976053985}},"probe":{"n_signal":24,"n_total":37,"best":"watch_ratio","best_auc":0.7485526353894544,"top":[{"n":"watch_ratio","auc":0.7485526353894544,"sig":true},{"n":"play_time_ms","auc":0.72874754398549,"sig":true},{"n":"onehot_feat1","auc":0.6278709027005609,"sig":true},{"n":"tag","auc":0.6062113549718358,"sig":true},{"n":"register_days","auc":0.41622058959917185,"sig":true},{"n":"tab","auc":0.5710939387094961,"sig":true},{"n":"friend_user_num","auc":0.5709851540354324,"sig":true},{"n":"duration_ms","auc":0.42958497256991957,"sig":true},{"n":"video_duration","auc":0.4365859323893814,"sig":true},{"n":"user_active_degree","auc":0.5513399621995787,"sig":true}],"fingerprint":{"double_click_cnt":0.6328126732693726,"like_cnt":0.6281835025042225,"play_cnt":0.5049193780796148,"show_cnt":0.5031207841650668},"n_agg":50},"data":{"users":27285,"videos":7583,"logged":1436609,"random":1186059,"train_rows":1141112}};
+const NS="http://www.w3.org/2000/svg";
+const el=(n,a)=>{const e=document.createElementNS(NS,n);for(const k in a)e.setAttribute(k,a[k]);return e;};
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const comma=n=>Math.round(n).toLocaleString("en-US");
+
+const tip=document.getElementById("tip");let tipOn=false;
+function showTip(e,h){tip.innerHTML=h;tip.classList.add("on");tipOn=true;moveTip(e);}
+function moveTip(e){if(!tipOn)return;const r=tip.getBoundingClientRect();
+  let x=e.clientX+15,y=e.clientY+15;
+  if(x+r.width>innerWidth-10)x=e.clientX-r.width-15;
+  if(y+r.height>innerHeight-10)y=e.clientY-r.height-15;
+  tip.style.left=Math.max(8,x)+"px";tip.style.top=Math.max(8,y)+"px";}
+function hideTip(){tip.classList.remove("on");tipOn=false;}
+addEventListener("scroll",hideTip,{passive:true});
+function hover(n,h){n.addEventListener("mouseenter",e=>showTip(e,h));
+  n.addEventListener("mousemove",moveTip);n.addEventListener("mouseleave",hideTip);}
+
+const E=D.exposure, btnA=document.getElementById("btnA"), btnB=document.getElementById("btnB");
+const F={auc:document.getElementById("mAuc"),lift:document.getElementById("mLift"),
+  ratio:document.getElementById("mRatio"),ece:document.getElementById("mEce")};
+const C={auc:document.getElementById("chipAuc"),lift:document.getElementById("chipLift"),
+  ratio:document.getElementById("chipRatio"),ece:document.getElementById("chipEce")};
+function chip(n,ok,t){n.className="chip "+(ok?"hold":"break");n.textContent=t;}
+
+function render(which){
+  const d=which==="a"?E.a:E.b, isA=which==="a";
+  F.auc.textContent=d.auc.toFixed(4);
+  F.lift.textContent=d.lift.toFixed(2)+"×";
+  F.ratio.textContent=d.ratio.toFixed(2)+"×";
+  F.ece.textContent=d.ece.toFixed(4);
+  F.auc.style.color=css("--text"); F.lift.style.color=css("--text");
+  F.ratio.style.color=isA?css("--good"):css("--crit");
+  F.ece.style.color=isA?css("--text"):css("--crit");
+  chip(C.auc,true,isA?"baseline":"−0.017 · holds");
+  chip(C.lift,true,isA?"baseline":"−2.0% · transfers");
+  chip(C.ratio,isA,isA?"calibrated":"2× overconfident");
+  chip(C.ece,isA,isA?"baseline":"2.1× worse");
+  document.getElementById("rigSub").textContent=
+    comma(d.rows)+" rows · base "+(d.base*100).toFixed(2)+"% · 22 Apr – 8 May";
+  document.getElementById("verdict").innerHTML= isA
+    ? "This is the traffic the recommender actually served. The model is well calibrated here — "
+      +"it predicts engagement at almost exactly the rate that occurs."
+    : "Same model, same window, exposure chosen at random. <b>Ranking barely moves. Calibration "
+      +"doubles.</b> Engagement runs "+E.base_ratio.toFixed(2)+"× higher under algorithmic "
+      +"exposure, and the model carries that inflation into its probabilities.";
+  btnA.classList.toggle("on",isA); btnB.classList.toggle("on",!isA);
+}
+btnA.addEventListener("click",()=>render("a"));
+btnB.addEventListener("click",()=>render("b"));
+
+function drawLift(){
+  const svg=document.getElementById("liftPlot"); svg.textContent="";
+  const L=D.lift_curve,n=L.length,W=660,H=290,PL=46,PR=18,PT=22,PB=52;
+  const pw=W-PL-PR,ph=H-PT-PB,maxV=32,Y=v=>PT+(1-v/maxV)*ph,slot=pw/n;
+  [0,8,16,24,32].forEach(v=>{
+    svg.appendChild(el("line",{x1:PL,y1:Y(v),x2:PL+pw,y2:Y(v),class:"gridline"}));
+    const t=el("text",{x:PL-9,y:Y(v)+3.5,class:"axlab","text-anchor":"end"});
+    t.textContent=v+"×";svg.appendChild(t);});
+  svg.appendChild(el("line",{x1:PL,y1:Y(1),x2:PL+pw,y2:Y(1),stroke:css("--text"),
+    "stroke-width":1.2,"stroke-dasharray":"4 3"}));
+  const bl=el("text",{x:PL+pw,y:Y(1)-6,class:"axlab","text-anchor":"end",fill:css("--text")});
+  bl.textContent="1× = no better than random";svg.appendChild(bl);
+  L.forEach((d,i)=>{
+    const x0=PL+i*slot,bw=(slot-18)/2;
+    [["a",d.a,css("--accent")],["b",d.b,css("--crit")]].forEach(([k,v,col],j)=>{
+      const x=x0+7+j*(bw+2),g=el("g");
+      g.appendChild(el("rect",{x:x0,y:PT,width:slot,height:ph,fill:"transparent"}));
+      g.appendChild(el("rect",{x,y:Y(v),width:bw,height:Y(0)-Y(v),rx:4,fill:col}));
+      hover(g,"<span class='hd'>Top "+(d.k*100).toFixed(d.k<0.1?0:1)+"%</span>"
+        +"algorithmic <b>"+d.a.toFixed(2)+"×</b><br>random <b>"+d.b.toFixed(2)+"×</b><br>"
+        +"gap <b>"+((d.b/d.a-1)*100).toFixed(1)+"%</b>");
+      svg.appendChild(g);});
+    const t=el("text",{x:x0+slot/2,y:H-PB+18,class:"axlab","text-anchor":"middle","font-size":"10"});
+    t.textContent="top "+(d.k*100).toFixed(d.k<0.1?0:1)+"%";svg.appendChild(t);});
+  const xl=el("text",{x:PL+pw/2,y:H-8,class:"axlab","text-anchor":"middle"});
+  xl.textContent="lift over that split's own base rate";svg.appendChild(xl);
+}
+
+const NICE={none:"None (raw model)",scalar:"Scalar",platt:"Platt",isotonic:"Isotonic"};
+function fillTable(){
+  const tb=document.querySelector("#calTable tbody");
+  ["none","scalar","platt","isotonic"].forEach(k=>{
+    const e=D.cal.eval[k],s=D.cal.side[k];
+    const g=v=>v.brier_gate==="SHIP"?"<span class='gate ship'>SHIP</span>"
+      :v.brier_gate==="reject"?"<span class='gate rej'>REJECT</span>"
+      :"<span style='color:var(--text-muted)'>—</span>";
+    const tr=document.createElement("tr");
+    tr.innerHTML="<td><b>"+NICE[k]+"</b></td>"
+      +"<td class='num'>"+e.pred_over_actual.toFixed(3)+"×</td><td class='num'>"+g(e)+"</td>"
+      +"<td class='num'>"+s.pred_over_actual.toFixed(3)+"×</td><td class='num'>"+g(s)+"</td>";
+    tb.appendChild(tr);});
+}
+
+function boot(){render("a");drawLift();fillTable();}
+if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",boot,{once:true});
+else boot();
+const mq=matchMedia("(prefers-color-scheme: dark)");
+const redraw=()=>{drawLift();render(btnA.classList.contains("on")?"a":"b");};
+mq.addEventListener?mq.addEventListener("change",redraw):mq.addListener(redraw);
+new MutationObserver(redraw).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+})();
+</script>
+</body>
+</html>
