@@ -199,3 +199,16 @@ footer{margin-top:70px;padding-top:22px;border-top:1px solid var(--rule)}
 footer p{font-family:var(--mono);font-size:11px;line-height:1.8;color:var(--text-muted)}
 footer a{color:var(--text-muted)}
 footer a:hover{color:var(--accent)}
+
+/* ── the four services, listed in reading order ── */
+.series{margin:6px 0 2px;border:1px solid var(--rule-soft);border-radius:10px;
+  background:var(--bg-sunk);padding:12px 15px 4px}
+.series-h{font-family:var(--mono);font-size:10px;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--text-muted);margin-bottom:4px}
+.srv{display:grid;grid-template-columns:24px 1fr;gap:1px 10px;text-decoration:none;
+  padding:9px 0;border-top:1px solid var(--rule-soft);align-items:baseline}
+.srv:first-of-type{border-top:none}
+.srv-n{font-family:var(--mono);font-size:10.5px;color:var(--accent);grid-row:span 2}
+.srv-name{font-family:var(--display);font-weight:600;font-size:14.5px;color:var(--text)}
+.srv-q{font-size:13.5px;color:var(--text-muted)}
+.srv:hover .srv-name{color:var(--accent)}
