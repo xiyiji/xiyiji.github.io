@@ -13,7 +13,18 @@
 <meta property="og:url" content="https://xiyiji.github.io/">
 <link rel="canonical" href="https://xiyiji.github.io/">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#127919;</text></svg>">
-<style>*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}body{margin:0;padding:0}img{max-width:100%}</style>
+<style>*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}body{margin:0;padding:0}img{max-width:100%}
+/* the four services, in documented reading order */
+.series{margin-top:13px;border:1px solid var(--rule-soft);border-radius:10px;background:var(--card-2);padding:12px 15px 4px}
+.series-h{font-family:var(--mono);font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--faint);margin-bottom:4px}
+.srv{display:grid;grid-template-columns:24px 1fr;gap:1px 10px;text-decoration:none;padding:9px 0;border-top:1px solid var(--rule-soft);align-items:baseline}
+.srv:first-of-type{border-top:none}
+.srv-n{font-family:var(--mono);font-size:10.5px;color:var(--sig);grid-row:span 2}
+.srv-name{font-family:var(--display);font-weight:600;font-size:14.5px;color:var(--ink);letter-spacing:-.01em}
+.srv-q{font-family:var(--body);font-size:13.5px;color:var(--muted)}
+.srv:hover .srv-name{color:var(--sig)}
+.srv:focus-visible{outline:2px solid var(--sig);outline-offset:3px;border-radius:4px}
+</style>
 <title>Mengyun Wang</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -328,8 +339,17 @@ footer b{color:var(--muted);font-weight:500}
       </div>
     </a>
 
-    <a class="entry" href="https://github.com/PSCRedefine/kuairand-lab" target="_blank" rel="noopener">
-      <div class="entry-top"><h3>KuaiRand Lab</h3><span class="venue">Real Kuaishou logs</span></div>
+
+    <div class="series">
+      <div class="series-h">The four services, in reading order</div>
+      <a class="srv" href="https://github.com/PSCRedefine/SinglePrediction" target="_blank" rel="noopener"><span class="srv-n">01</span><span class="srv-name">Single Prediction</span><span class="srv-q">Is the model right?</span></a>
+      <a class="srv" href="https://github.com/PSCRedefine/BatchPrediction" target="_blank" rel="noopener"><span class="srv-n">02</span><span class="srv-name">Batch Prediction</span><span class="srv-q">Does it hold up at volume?</span></a>
+      <a class="srv" href="https://github.com/PSCRedefine/ModelInfo" target="_blank" rel="noopener"><span class="srv-n">03</span><span class="srv-name">Model Info</span><span class="srv-q">Is the artefact in memory the one that was shipped?</span></a>
+      <a class="srv" href="https://github.com/PSCRedefine/AnalyticsDashboard" target="_blank" rel="noopener"><span class="srv-n">04</span><span class="srv-name">Analytics Dashboard</span><span class="srv-q">Is it still healthy today?</span></a>
+    </div>
+
+    <a class="entry" href="https://github.com/PSCRedefine/groundtruth" target="_blank" rel="noopener">
+      <div class="entry-top"><h3>GroundTruth</h3><span class="venue">Real Kuaishou logs</span></div>
       <p>Three experiments on unbiased offline evaluation, using the discipline above against real
       randomized-exposure data. Measures what exposure bias costs, shows that ranking transfers while
       calibration does not, and demonstrates that no single calibrator serves both traffic types.
