@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MCP is not dead — it is just not a personal-productivity tool — Mengyun Wang</title>
+<meta name="description" content="The CLI-vs-MCP argument is really a question about who owns a tool definition — and neither side is arguing about the part that decides whether the call should have happened at all.">
+<meta name="author" content="Mengyun Wang">
+<meta name="theme-color" content="#faf9f6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f0f17" media="(prefers-color-scheme: dark)">
+<meta property="og:title" content="MCP is not dead — it is just not a personal-productivity tool">
+<meta property="og:description" content="The CLI-vs-MCP argument is really a question about who owns a tool definition.">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://xiyiji.github.io/writing/mcp-is-not-dead.html">
+<link rel="canonical" href="https://xiyiji.github.io/writing/mcp-is-not-dead.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#127919;</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&family=LXGW+WenKai+TC:wght@400;700&display=swap">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<div class="wrap">
+
+<div class="page-head">
+  <a class="backlink" href="./"><span class="arw">←</span> Writing</a>
+  <h1 style="font-size:clamp(28px,4.6vw,40px)">MCP is not dead — it is just not a personal-productivity tool</h1>
+  <p class="page-sub">2026.08.29 &nbsp;·&nbsp; Draft &nbsp;·&nbsp; notes on someone else's argument</p>
+</div>
+
+<article class="post" style="padding-top:34px">
+
+<p>The <b>&ldquo;MCP is dead&rdquo;</b> take has been circulating for a while: agents are getting
+good enough at using ordinary command-line tools that standing up a Model Context Protocol
+server for them looks like ceremony. Paul Iusztin pushed back on it this week, and his
+framing is the one I want to keep: the technology is not defunct, it is being evaluated
+against the wrong problem.</p>
+
+<p>I think that is right, and I think the reason it is right is more specific than
+&ldquo;enterprise needs governance.&rdquo;</p>
+
+<h2>The argument, compressed</h2>
+
+<p>For one engineer on one laptop, a CLI genuinely wins. There is no process to run, no
+transport to debug, no auth to configure, no schema to keep in sync with the function it
+describes. The agent discovers the interface by reading <code>--help</code>, the same way I would.
+Connecting a model to Obsidian or Readwise this way is a twenty-minute job, and an MCP server
+for the same thing is not twenty minutes.</p>
+
+<p>The counter-argument, in Iusztin's words, is to
+&ldquo;try scaling that across a company deploying thousands of AI agents.&rdquo;
+That is where the CLI answer stops being obviously cheaper.</p>
+
+<h2>What the CLI answer quietly assumes</h2>
+
+<p>Every argument for the CLI is load-bearing on four assumptions that hold on a laptop and
+fail in an organisation:</p>
+
+<ul>
+  <li><b>One machine</b>, which you administer. Installing a tool is <code>brew install</code>, not a fleet rollout.</li>
+  <li><b>One identity.</b> The tool inherits your credentials, and your credentials are the right ones.</li>
+  <li><b>Updates propagate because you pull.</b> There is exactly one copy of the logic, and you are looking at it.</li>
+  <li><b>A wrong tool costs you an afternoon</b>, not a compliance incident across every team that happened to install it.</li>
+</ul>
+
+<p>None of those survive contact with a thousand agents and several hundred people. The
+question stops being <i>how does a model invoke this function</i> and becomes <i>where does the
+one true definition of this function live, and who is allowed to change it.</i></p>
+
+<h2>The real axis: who owns the tool definition</h2>
+
+<div class="scroller">
+<table>
+<thead>
+<tr><th>&nbsp;</th><th>One laptop</th><th>One organisation</th></tr>
+</thead>
+<tbody>
+<tr><td><b>Install</b></td><td>you, once</td><td>every machine, forever</td></tr>
+<tr><td><b>Update path</b></td><td>git pull</td><td>redeploy one server, everyone moves</td></tr>
+<tr><td><b>Credentials</b></td><td>yours, already on disk</td><td>held centrally, never handed to the agent</td></tr>
+<tr><td><b>Audit</b></td><td>shell history</td><td>a request log with an identity attached</td></tr>
+<tr><td><b>Blast radius of a bad change</b></td><td>your afternoon</td><td>every agent that calls it</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>Read that way, MCP is not a smarter calling convention. It is a distribution boundary —
+the same reason companies expose an internal service instead of letting every team write its
+own query against the production database. Nobody argues that HTTP APIs are dead because
+<code>psql</code> exists on your laptop. The laptop was never the case the API was built for.</p>
+
+<p class="pull">The protocol question is downstream of an ownership question: how many
+people have to agree when this tool changes?</p>
+
+<p>If the answer is <b>one</b>, write the CLI. If the answer is <b>four teams and a security
+review</b>, you are going to build the server eventually, and doing it late is more expensive
+than doing it early.</p>
+
+<h2>Where I would push back on both sides</h2>
+
+<p>Both camps are arguing about <b>invocation</b>. Neither is arguing about
+<b>verification</b>, which is the part I actually spend my time on.</p>
+
+<p>Whether the model reaches a function through a subprocess or a JSON-RPC session,
+nothing in either path tells you whether calling it was the right decision. A tool call that
+returns <code>200</code> is not a tool call that should have happened. The failure mode I keep
+seeing is not a broken transport; it is an agent confidently selecting the wrong tool, or the
+right tool with the wrong arguments, and the plumbing dutifully reporting success.</p>
+
+<p>That is a measurement problem, and it looks a lot like the offline-evaluation problems I
+work on elsewhere: the system scores well on the traffic it was demonstrated against and
+behaves differently on the traffic it did not choose.</p>
+
+<h2>What I would want to measure</h2>
+
+<ul>
+  <li><b>Selection accuracy against surface area.</b> Does tool-choice accuracy degrade as one
+  server exposes 10, 30, 60 tools? I would expect it to, and I have not seen a number I trust.</li>
+  <li><b>Cost of discovery.</b> Schemas in context every turn, versus <code>--help</code> read once —
+  which is actually cheaper across a long session?</li>
+  <li><b>Version skew.</b> When the server updates and an agent's cached idea of the interface
+  does not, does it fail loudly or quietly? Quietly is the expensive answer.</li>
+</ul>
+
+<p>Open questions, not conclusions. This is a first draft of a thought, written the day I read
+the post that provoked it.</p>
+
+<div class="src">
+  <b>Written against</b>
+  Paul Iusztin, <i>&ldquo;MCP is NOT dead… You're just using it for the wrong problem&rdquo;</i> —
+  <a href="https://www.linkedin.com/feed/update/urn:li:activity:7444481363224936448/" target="_blank" rel="noopener">LinkedIn</a>.
+  The framing is his; the assumptions table and everything after &ldquo;where I would push back&rdquo; are mine.
+</div>
+
+</article>
+
+</div>
+</body>
+</html>
