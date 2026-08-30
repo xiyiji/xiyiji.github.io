@@ -213,12 +213,12 @@ footer a:hover{color:var(--accent)}
 .srv-q{font-size:13.5px;color:var(--text-muted)}
 .srv:hover .srv-name{color:var(--accent)}
 
-/* ── writing: index list ── */
+/* ── blogs: index list ── */
 .post-list{display:grid;gap:2px}
 .post-list .entry-meta{display:flex;gap:10px;align-items:baseline;margin-bottom:6px}
 .dot{color:var(--rule)}
 
-/* ── writing: a single note ── */
+/* ── blogs: a single post ── */
 .post{max-width:66ch;font-size:16.5px;line-height:1.72;color:var(--text-secondary)}
 .post>*+*{margin-top:16px}
 .post h2{font-size:20px;color:var(--text);margin-top:40px}
