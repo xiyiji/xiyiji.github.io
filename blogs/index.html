@@ -39,6 +39,30 @@
   <h2 class="section-title">Posts</h2>
   <div class="post-list">
 
+    <a class="entry" href="decode-is-memory-bound.html">
+      <div class="entry-meta">2026.08.30 <span class="dot">/</span> inference · performance</div>
+      <div class="entry-title">Decode is memory-bound by construction</div>
+      <div class="entry-desc">Prefill and decode run the same weights through the same kernels and
+      land 430× apart in arithmetic intensity. Working out why gives a closed-form ceiling that no
+      batch size can beat — and reframes what continuous batching and chunked prefill are buying.</div>
+      <div class="entry-tags">
+        <span class="tag">notes</span>
+        <span class="tag">worked example</span>
+      </div>
+    </a>
+
+    <a class="entry" href="trpo-state-distribution.html">
+      <div class="entry-meta">2026.08.30 <span class="dot">/</span> RL · policy optimisation</div>
+      <div class="entry-title">Ignoring the state distribution in TRPO is not an approximation</div>
+      <div class="entry-desc">The step every derivation waves a hand at is exact to first order.
+      The state distribution's derivative is not small — it is annihilated by a property of the
+      advantage function, which also explains why the baseline has to be V and not Q.</div>
+      <div class="entry-tags">
+        <span class="tag">notes</span>
+        <span class="tag">derivation</span>
+      </div>
+    </a>
+
     <a class="entry" href="mcp-is-not-dead.html">
       <div class="entry-meta">2026.08.29 <span class="dot">/</span> agents · tooling</div>
       <div class="entry-title">MCP is not dead — it is just not a personal-productivity tool</div>
