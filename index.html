@@ -62,6 +62,11 @@
   <h2 class="section-title">News</h2>
   <div class="news">
     <div class="news-item">
+      <span class="news-date">2026.09</span>
+      <span class="news-body">Built <b><a href="https://github.com/xiyiji/atlas-llm-execution-agent">Atlas</a></b> —
+      a five-agent committee with a human approval gate, durable state, and a live event stream.</span>
+    </div>
+    <div class="news-item">
       <span class="news-date">2026.08</span>
       <span class="news-body">Started <b><a href="blogs/">Blogs</a></b> — daily notes on
       AI engineering and evaluation.</span>
@@ -85,6 +90,23 @@
 <section id="projects">
   <h2 class="section-title">Projects</h2>
   <div class="entries">
+
+    <a class="entry" href="https://github.com/xiyiji/atlas-llm-execution-agent" target="_blank" rel="noopener">
+      <div class="entry-title">Atlas</div>
+      <div class="entry-meta">Multi-agent execution platform &nbsp;&middot;&nbsp; FastAPI &middot; Celery &middot; PostgreSQL &middot; SSE</div>
+      <div class="entry-desc">Five agents &mdash; Planner, Safety, Coder, Browser, Verifier &mdash; run by one
+      orchestrator that owns every state change. Plans are scored twice, by the Safety agent and by fixed
+      rules, and anything over the line waits for a person before it runs. Steps retry, the Verifier can
+      send work back once, and every event is in the database before it reaches the UI, so a task
+      survives a restart and can be replayed. Code runs in a locked-down container; web fetches are
+      checked against private networks. Runs end-to-end with no model keys.</div>
+      <div class="entry-tags">
+        <span class="tag"><b>5</b> agents</span>
+        <span class="tag">human <b>approval gate</b></span>
+        <span class="tag"><b>38</b> tests &middot; CI</span>
+        <span class="tag">works <b>offline</b></span>
+      </div>
+    </a>
 
     <a class="entry" href="https://llm-serving-platform.vercel.app" target="_blank" rel="noopener">
       <div class="entry-title">LLM Serving Platform</div>
