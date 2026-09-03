@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Atlas — Mengyun Wang</title>
+<meta name="description" content="A five-agent committee with a human approval gate, durable state, and a live event stream.">
+<meta name="theme-color" content="#faf9f6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f0f17" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#127919;</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&family=LXGW+WenKai+TC:wght@400;700&display=swap">
+<link rel="stylesheet" href="../assets/style.css">
+<style>td code{font-family:var(--mono);font-size:.86em;background:var(--bg-sunk);padding:1px 5px;border-radius:4px}</style>
+</head>
+<body>
+<div class="wrap">
+<div class="page-head">
+  <a class="backlink" href="../"><span class="arw">←</span> Mengyun Wang</a>
+  <h1 style="font-size:clamp(28px,4.6vw,38px)">Atlas</h1>
+  <p class="page-sub">Multi-agent execution platform &nbsp;·&nbsp; <a href="https://github.com/xiyiji/atlas-llm-execution-agent" target="_blank" rel="noopener">source →</a></p>
+</div>
+
+<section style="padding-top:34px">
+  <div class="prose">
+    <p>You give Atlas a goal. A Planner turns it into steps; a Safety agent and a fixed set of
+    keyword rules both score the plan, and the higher score wins, so a persuasive model can't
+    talk its way past the gate. Anything over the line stops and waits for a person. Then a
+    Browser searches and reads, a Coder writes and runs Python in a sandbox, a Verifier checks
+    the result against the goal and can send everything back for one more pass. One orchestrator
+    owns every state change and never calls a model itself.</p>
+    <p>Every event is written to the database before it reaches the UI, so a task survives a
+    restart, can be replayed, and can be audited. The whole thing runs end-to-end with no model
+    keys; point it at Ollama or an API key and the same code talks to a real model.</p>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="n">5</div><div class="l">agents, one orchestrator</div></div>
+    <div class="stat"><div class="n">2</div><div class="l">risk scores, the higher one wins</div></div>
+    <div class="stat"><div class="n">46</div><div class="l">tests, lifecycle to SSRF</div></div>
+    <div class="stat"><div class="n">0</div><div class="l">keys needed to run it</div></div>
+  </div>
+</section>
+
+<section>
+  <h2 class="section-title">What's in it</h2>
+  <div class="scroller"><table>
+    <thead><tr><th>Area</th><th>Used here</th></tr></thead>
+    <tbody>
+      <tr><td><b>Agent design</b></td><td>Five agents behind one <code>run(task, step)</code> contract; an orchestrator that owns all state and never calls a model</td></tr>
+      <tr><td><b>Control flow</b></td><td>Task graph, bounded retries with backoff, one verifier-driven rework pass, human approval gate with a timeout</td></tr>
+      <tr><td><b>Risk scoring</b></td><td>Keyword rules merged with a model score — the model can't lower the floor</td></tr>
+      <tr><td><b>LLM plumbing</b></td><td>One layer over Anthropic, Groq, Gemini, Cerebras, Ollama; JSON mode plus a parser that digs JSON out of prose; a deterministic demo provider for tests</td></tr>
+      <tr><td><b>Prompt hygiene</b></td><td>Fetched web text wrapped in markers and declared as data, not instructions, in every system prompt</td></tr>
+      <tr><td><b>Persistence</b></td><td>SQLAlchemy 2, SQLite (WAL) by default, PostgreSQL by URL, Alembic migrations; event stored before broadcast</td></tr>
+      <tr><td><b>Crash safety</b></td><td>Unfinished tasks resume from the last completed step after a restart; approvals survive restarts and expire on a schedule</td></tr>
+      <tr><td><b>Background work</b></td><td>Celery with late acks and a per-task Redis lock; a high-risk task pauses in the database and frees its worker</td></tr>
+      <tr><td><b>Real-time</b></td><td>SSE with snapshot-on-connect, keepalives, replay from the database on reconnect; Redis pub/sub across API replicas</td></tr>
+      <tr><td><b>Auth</b></td><td>API keys → tenants, constant-time comparison, HMAC-signed HttpOnly cookies, tenant checked on every query</td></tr>
+      <tr><td><b>Abuse limits</b></td><td>Fixed-window rate limiting (Redis or in-memory), request size cap, trusted-host and CORS allowlists</td></tr>
+      <tr><td><b>Sandboxing</b></td><td>Deny-list, then <code>python -I</code> in a clean env, or a throwaway Docker container: no network, read-only root, dropped capabilities, CPU/memory/PID limits</td></tr>
+      <tr><td><b>SSRF defence</b></td><td>Scheme/port/credential checks, DNS resolved and every address checked for global scope, redirects re-validated hop by hop, type and size limits</td></tr>
+      <tr><td><b>Observability</b></td><td>JSON logs, request IDs, Prometheus metrics for HTTP, task events and model calls; health endpoint probes the provider</td></tr>
+      <tr><td><b>Failure reporting</b></td><td>A dead provider fails the task with a message that says what to run, and shows as a banner before you submit</td></tr>
+      <tr><td><b>Memory</b></td><td>Per-task working memory in process; episodic memory in the database, fed back into planning</td></tr>
+      <tr><td><b>API &amp; frontend</b></td><td>FastAPI with dependency-injected tenant context; plain HTML/JS with <code>EventSource</code>, no build step</td></tr>
+      <tr><td><b>Packaging</b></td><td>Docker Compose (Postgres, Redis, migrate job, API, worker), non-root read-only image, healthchecks, CI with ruff and pip-audit</td></tr>
+      <tr><td><b>Testing</b></td><td>46 pytest cases: unit, lifecycle, HTTP with SSE, security; <code>httpx.MockTransport</code> for network paths; monkeypatched agents for retry and rework</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+</div>
+</body>
+</html>
