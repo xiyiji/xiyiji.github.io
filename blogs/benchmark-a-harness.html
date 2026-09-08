@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Putting a number on a coding-agent harness — Mengyun Wang</title>
+<meta name="description" content="I ran a small coding-agent harness on Aider's polyglot benchmark. It solved 24 of 25 exercises. The more useful number was where the money went.">
+<meta name="author" content="Mengyun Wang">
+<meta name="theme-color" content="#faf9f6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f0f17" media="(prefers-color-scheme: dark)">
+<meta property="og:title" content="Putting a number on a coding-agent harness">
+<meta property="og:description" content="24 of 25 on the polyglot benchmark — and four exercises that cost more than the other twenty-one together.">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://xiyiji.github.io/blogs/benchmark-a-harness.html">
+<link rel="canonical" href="https://xiyiji.github.io/blogs/benchmark-a-harness.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#127919;</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<div class="wrap">
+
+<div class="page-head">
+  <a class="backlink" href="./"><span class="arw">←</span> Blogs</a>
+  <h1 style="font-size:clamp(28px,4.6vw,40px)">Putting a number on a coding-agent harness</h1>
+  <p class="page-sub">2026.09.08 &nbsp;·&nbsp; agents · benchmarks &nbsp;·&nbsp; one afternoon, $7.33</p>
+</div>
+
+<article class="post" style="padding-top:34px">
+
+<p><a href="https://github.com/xiyiji/mini-harness" target="_blank" rel="noopener">mini-harness</a>
+is a coding-agent harness I wrote in about 1,800 lines of Python: an agent loop, nine tools
+defined as Pydantic models, read-before-write gating on file edits, a Docker sandbox for
+generated code, subagents, context compaction, a terminal UI. It had sixteen tests that drove
+the whole loop against a fake model server, and it had no numbers. A harness with no numbers
+is a description.</p>
+
+<p>So I ran it on the exercises from
+<a href="https://github.com/Aider-AI/polyglot-benchmark" target="_blank" rel="noopener">Aider's polyglot benchmark</a>
+&mdash; Exercism problems in Python, Go and Rust, each with a stub, an instructions page and its
+own test suite. The harness gets the instructions, the stub's name and the test command. The
+score is whether the exercise's tests pass afterwards. No model grades anything, so the number
+is the same number every time it is run.</p>
+
+<h2>The result</h2>
+
+<p>With <code>claude-haiku-4-5</code>: <b>24 of 25 exercises, 96%</b>. Python 12 of 12, Go 11 of 12,
+Rust 1 of 1. Median exercise: ten turns, about twelve cents, under a minute. The per-exercise
+report is in the repository.</p>
+
+<p>That is the headline, and it is the less interesting half.</p>
+
+<h2>Where the money went</h2>
+
+<p>The whole run cost $7.33. Four exercises cost $4.60 of that. <code>go/dominoes</code> ran for
+52 turns and $1.62 before failing; <code>go/connect</code> took 40 turns and $1.50 and passed;
+<code>rust/variable-length-quantity</code> and <code>go/pov</code> were the other two. The
+remaining twenty-one exercises averaged thirteen cents.</p>
+
+<p>The reason is not mysterious once you see it. Every turn of an agent loop re-sends the entire
+conversation, so an exercise that loops for fifty turns does not cost five times what an
+exercise that finishes in ten costs &mdash; it costs closer to twenty-five times. Cost grows with
+the square of the turn count. A harness that allows three hundred turns per task, as mine did in
+its benchmark profile, has no ceiling on what one task can spend.</p>
+
+<p>No unit test would have told me this. The tests check that the loop terminates, that a tool
+call with bad arguments comes back as a correctable error, that an edit to an unread file is
+refused. They cannot check what a task costs, because cost is a property of the model's
+behaviour on a real problem, and the fake server does not loop. The benchmark is the only
+instrument that measures it.</p>
+
+<p>The harness now has a per-task turn cap, and the benchmark driver reports turns and cost
+next to pass/fail for every exercise. With the cap at forty, the two late runaways stopped at
+$1.50 and $0.77 instead of wherever they would have gone.</p>
+
+<h2>Two things the scoring had to get right</h2>
+
+<p><b>Rust's tests are ignored by default.</b> Exercism marks every Rust test after the first with
+<code>#[ignore]</code>, so a plain <code>cargo test</code> runs one test, reports
+<code>ok</code>, and exits zero. My first Rust score was a clean 100% that measured nothing.
+The driver now runs <code>cargo test -- --include-ignored</code>, which is what the published
+benchmark does. A grader has to be verified too.</p>
+
+<p><b>The reference solution has to go.</b> Each Exercism exercise ships with an example solution
+under <code>.meta/</code>. The driver deletes it from the copy the agent sees, and marks any run
+that edits a test file as a failure whether or not the suite then passes.</p>
+
+<h2>What the number is and is not</h2>
+
+<p>It is not comparable to the leaderboard. That runs all 225 exercises across six languages
+with much larger models; this ran a 25-exercise subset in three languages with a small one.
+What it says is narrower and, for a harness, more useful: given the same model, does the loop
+around it get the problem solved, and what does that cost. Both answers are now in a file
+rather than in my head.</p>
+
+<div class="src">
+  <b>Code</b>
+  <a href="https://github.com/xiyiji/mini-harness" target="_blank" rel="noopener">github.com/xiyiji/mini-harness</a> &mdash;
+  <code>bench/run_polyglot.py</code> is the driver, <code>bench/report.md</code> the per-exercise results.
+</div>
+
+</article>
+
+</div>
+</body>
+</html>

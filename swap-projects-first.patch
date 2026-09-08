@@ -1,0 +1,72 @@
+From 6f3547967a22bf2fecb0a044f7a36f418f034763 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 1 Sep 2026 20:11:18 +0000
+Subject: [PATCH] =?UTF-8?q?Swap=20Blogs=20and=20Projects=20sections=20?=
+ =?UTF-8?q?=E2=80=94=20Projects=20first=20on=20homepage?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DbS4veeqTZJTQWwDqnGDau
+---
+ index.html | 36 ++++++++++++++++++------------------
+ 1 file changed, 18 insertions(+), 18 deletions(-)
+
+diff --git a/index.html b/index.html
+index d3d80ee..78f6fa4 100644
+--- a/index.html
++++ b/index.html
+@@ -81,24 +81,6 @@
+ </section>
+ 
+ 
+-<!-- ══ BLOGS ═════════════════════════════════════════════ -->
+-<section id="blogs">
+-  <h2 class="section-title">Blogs</h2>
+-  <div class="post-list">
+-
+-    <a class="entry" href="blogs/mcp-is-not-dead.html">
+-      <div class="entry-meta">2026.08.29 <span class="dot">/</span> agents · tooling</div>
+-      <div class="entry-title">MCP is not dead — it is just not a personal-productivity tool</div>
+-      <div class="entry-desc">The CLI-versus-MCP argument is really an ownership question: how many
+-      people have to agree when a tool definition changes. And both camps are arguing about
+-      invocation while nobody argues about whether the call should have happened at all.</div>
+-    </a>
+-
+-  </div>
+-  <p style="margin-top:14px"><a class="mono" style="font-size:13px" href="blogs/">All posts →</a></p>
+-</section>
+-
+-
+ <!-- ══ PROJECTS ══════════════════════════════════════════ -->
+ <section id="projects">
+   <h2 class="section-title">Projects</h2>
+@@ -177,6 +159,24 @@
+   
+ </section>
+ 
++
++<!-- ══ BLOGS ═════════════════════════════════════════════ -->
++<section id="blogs">
++  <h2 class="section-title">Blogs</h2>
++  <div class="post-list">
++
++    <a class="entry" href="blogs/mcp-is-not-dead.html">
++      <div class="entry-meta">2026.08.29 <span class="dot">/</span> agents · tooling</div>
++      <div class="entry-title">MCP is not dead — it is just not a personal-productivity tool</div>
++      <div class="entry-desc">The CLI-versus-MCP argument is really an ownership question: how many
++      people have to agree when a tool definition changes. And both camps are arguing about
++      invocation while nobody argues about whether the call should have happened at all.</div>
++    </a>
++
++  </div>
++  <p style="margin-top:14px"><a class="mono" style="font-size:13px" href="blogs/">All posts →</a></p>
++</section>
++
+ </div>
+ </body>
+ </html>
+-- 
+2.43.0
+
