@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Building an agent runtime: the five things that only broke when I ran them — Mengyun Wang</title>
+<meta name="description" content="Notes from building a small durable agent runtime — journalled execution, a context budget, retrieval judged by real answers, a sandbox, and a regression gate — and what each piece got wrong before a test caught it.">
+<meta name="author" content="Mengyun Wang">
+<meta name="theme-color" content="#faf9f6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f0f17" media="(prefers-color-scheme: dark)">
+<meta property="og:title" content="Building an agent runtime: the five things that only broke when I ran them">
+<meta property="og:description" content="A durable agent runtime, and the bugs that reading the code would never have found.">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://xiyiji.github.io/blogs/loomwork-what-broke.html">
+<link rel="canonical" href="https://xiyiji.github.io/blogs/loomwork-what-broke.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#127919;</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<div class="wrap">
+
+<div class="page-head">
+  <a class="backlink" href="./"><span class="arw">←</span> Blogs</a>
+  <h1 style="font-size:clamp(28px,4.6vw,40px)">Building an agent runtime: the five things that only broke when I ran them</h1>
+  <p class="page-sub">2026.09.08 &nbsp;·&nbsp; agents · infrastructure &nbsp;·&nbsp; notes from a two-day build</p>
+</div>
+
+<article class="post" style="padding-top:34px">
+
+<p>I spent two days building a small agent runtime called
+<a href="https://github.com/xiyiji/loomwork" target="_blank" rel="noopener">Loomwork</a>.
+Not another agent &mdash; the layer underneath one. It journals every step so a run can be
+killed and resumed, keeps a long run inside a token budget, serves retrieval as a runtime
+service, runs model-written code in a sandbox, and records a trace that an eval harness can
+score. Two agents that share nothing else run on it: one reads documentation and cites it, the
+other writes Python and runs it.</p>
+
+<p>The design mostly came out the way I planned. What I want to write down is the other
+part: five things that were wrong in a way no amount of reading the code would have shown,
+and that a test, a provider, or a kernel counter showed instead.</p>
+
+<h2>1. The pins were collected after the thing that removed them</h2>
+
+<p>The context layer does three things in order, cheapest first: shrink oversized tool
+results in place (a list keeps its head and gains <code>{"_omitted_items": 37}</code>), summarise
+the middle of the conversation while keeping the recent window verbatim, and restore any
+&ldquo;pinned&rdquo; fact &mdash; a ticket id, a path &mdash; that the other two steps dropped.</p>
+
+<p>The first version looked for pins <i>after</i> shrinking. It found nothing, every time.
+Shrinking is precisely the operation that deletes a fact sitting twelve rows deep in a
+payload, so by the time the pin search ran, there was nothing left to pin. The fix is one
+line &mdash; collect pins from the untouched conversation &mdash; but it only became visible in a
+measurement: a synthetic forty-step run with one required identifier at step three, scored
+under four strategies at four budgets. At a 4,000-token budget, truncating the oldest turns
+loses the identifier and 88% of the run's history; shrink-plus-summarise keeps the history
+and still loses the identifier; only pinning keeps both, for about forty tokens.</p>
+
+<h2>2. Read-only is not the same as absent</h2>
+
+<p>The sandbox binds the filesystem read-only, puts the process in a network namespace with
+no interfaces, and caps CPU, memory, file size and wall clock. The first version bound the
+<i>whole</i> filesystem read-only. Every write test passed. Then
+<code>open('/etc/shadow').read()</code> returned the file.</p>
+
+<p>The sandbox now mounts only the directories the interpreter needs &mdash; <code>/usr</code>,
+<code>/lib</code>, <code>/bin</code> and their siblings &mdash; so there is no <code>/etc</code> to read. A private key or
+a <code>.env</code> is not merely unwritable; it is not in the namespace. I keep coming back to this
+one because it is the shape of a whole class of security mistakes: the control was correct
+for the direction I was thinking about and silent about the other one.</p>
+
+<h2>3. The fork bomb was being stopped by the scheduler, not the sandbox</h2>
+
+<p>This one killed my test runner. The full suite began exiting with code 137 &mdash; the
+process itself killed &mdash; while every test file passed on its own.</p>
+
+<p>The fork-bomb test was &ldquo;contained&rdquo; by the wall clock. It should have been contained
+by <code>RLIMIT_NPROC</code>, but the sandbox was running as root inside a container, and the
+kernel does not enforce that limit for root. So for five seconds the bomb ran unchecked, and
+with the rest of the suite already resident, the out-of-memory killer picked the largest
+process in sight: pytest. Killing the outer sandbox process on timeout did not kill the tree
+inside it either, so dozens of orphans kept running on the host after the tool call had
+&ldquo;finished.&rdquo;</p>
+
+<p>Two fixes. Every run now gets its own control group with a process cap and a memory
+ceiling charged to the whole tree, and the child joins it between fork and exec; a fork bomb
+is refused on the first fork past the limit, in milliseconds, with the denial read from the
+kernel's own <code>pids.events</code> counter rather than inferred. And a timeout now kills the
+process group and everything the cgroup still lists, with a test that asserts nothing from a
+timed-out run is still running afterwards.</p>
+
+<p>The lesson I want to keep: a test that passes in isolation and fails in aggregate was
+telling the truth both times. The bomb <i>was</i> being stopped &mdash; just not by anything I
+had built.</p>
+
+<h2>4. The research agent could retrieve its own question</h2>
+
+<p>For the retrieval layer I wanted judgements that came from people rather than from me.
+The corpus is a snapshot of an open-source project's documentation and its closed issues,
+and the issue tracker turns out to contain relevance judgements nobody had to write: when a
+user asks a question and a maintainer answers with a link to a documentation page, that pair
+is a query and a judged page, phrased the way users actually phrase things. Sixty-seven of
+them, split into gold (a maintainer posted the link) and silver (the user was already on that
+page).</p>
+
+<p>The ablation over four retrieval modes came out the way the literature says it should
+&mdash; keyword and embedding search fail on different queries, rank fusion recovers more than
+either, reranking buys a few more points at two orders of magnitude more latency &mdash; but
+only after two corrections that were both about leakage. The query's own issue was in the
+corpus, and its own text is the best possible match for itself; with it left in, every mode
+was being scored on finding the question. And when I ran the research <i>agent</i> against the
+same tasks, it did the same thing one level up: searched, found the issue it was being asked
+about, and cited it. Perfect grounding, on the wrong document. Each task's own issue is now
+excluded from its retriever.</p>
+
+<p>The number that came out of the agent eval is modest &mdash; the judged page is cited in a
+third of runs &mdash; and the useful part is that the harness reports <i>retrieved</i> and
+<i>cited</i> separately. The page was retrieved in half the runs. So the ceiling is the retrieval
+layer, which agrees with the retrieval ablation's own recall, and the two layers being scored
+independently is what lets me say that instead of guessing.</p>
+
+<h2>5. A run that hit its step limit returned nothing</h2>
+
+<p>Two research tasks in the first live run burned eight steps searching and returned an
+empty answer. One of them wrote &ldquo;Perfect! I found the relevant information&rdquo; at step four
+and kept searching anyway.</p>
+
+<p>The runtime now makes one last model call when the step limit is reached, with tools
+withheld: <i>answer with what you have</i>. It costs one step and turned both empty runs into
+answers. The related bug was found by the provider rather than by me: after compaction, the
+verbatim window could open on a tool result whose call was in a turn that had just been
+summarised away, and the API rejects a result with no matching call in the previous turn. The
+window boundary now moves back to the assistant turn that made the calls.</p>
+
+<h2>What held up</h2>
+
+<p>The piece I was most worried about is the one that did not move: the journal. Every model
+response, tool call and result is an append-only event with a sequence number allocated in
+the same transaction that writes it. A run is resumed by replaying the journal, never by
+re-prompting &mdash; the model's answers are already recorded, and asking again would produce
+different text for the same step. Side-effecting tools get an idempotency key derived from
+durable data (run, step, call id, arguments), so a resumed run regenerates the same key and a
+tool can recognise work it already did. When the effect lives in the same database as the
+ledger, they commit together and the operation is applied exactly once; when the effect is
+external, the honest guarantee is at-least-once plus an idempotent receiver, and the key is
+what the receiver deduplicates on.</p>
+
+<p>The test I trust most starts a twelve-step run whose one tool has a real side effect, lets
+the tool commit its seventh effect and then send itself <code>SIGKILL</code> &mdash; the window
+where the work is done and the journal does not know it &mdash; restarts the process, and checks
+that the run completes with twelve effects and not thirteen.</p>
+
+<h2>The claim, kept small</h2>
+
+<p>Two agents that share nothing but the runtime run on it, are journalled by it, are held to
+a context budget by it, and are scored by the same harness. The runtime never learns which
+one is running. Every number in the repository is regenerated from source, and the eval
+baseline is a committed journal that CI re-scores on every push without a key. The five
+things above are in the build log, next to the tests they left behind.</p>
+
+<div class="src">
+  <b>Code</b>
+  <a href="https://github.com/xiyiji/loomwork" target="_blank" rel="noopener">github.com/xiyiji/loomwork</a> &mdash;
+  the DEVLOG there records each step and each of the mistakes above in more detail than this post.
+</div>
+
+</article>
+
+</div>
+</body>
+</html>
