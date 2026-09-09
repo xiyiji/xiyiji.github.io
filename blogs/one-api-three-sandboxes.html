@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>One API, three sandboxes — Mengyun Wang</title>
+<meta name="description" content="A sandbox execution service for agents with runc, gVisor and Firecracker behind one gRPC API, and an escape suite that has to be able to tell them apart.">
+<meta name="author" content="Mengyun Wang">
+<meta name="theme-color" content="#faf9f6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f0f17" media="(prefers-color-scheme: dark)">
+<meta property="og:title" content="One API, three sandboxes">
+<meta property="og:description" content="The same thirteen escape attempts against every runtime, a warm pool that restores instead of boots, and three bugs the tests found before the benchmark did.">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://xiyiji.github.io/blogs/one-api-three-sandboxes.html">
+<link rel="canonical" href="https://xiyiji.github.io/blogs/one-api-three-sandboxes.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#129521;</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<div class="wrap">
+
+<div class="page-head">
+  <a class="backlink" href="./"><span class="arw">←</span> Blogs</a>
+  <h1 style="font-size:clamp(28px,4.6vw,40px)">One API, three sandboxes</h1>
+  <p class="page-sub">2026.09.09 &nbsp;·&nbsp; agents · infrastructure &nbsp;·&nbsp; part one of two</p>
+</div>
+
+<article class="post" style="padding-top:34px">
+
+<p>Every agent platform ends up with the same component: a service that takes a command from a
+model, runs it somewhere the model cannot hurt anything, and returns the output. The interesting
+question is what "somewhere" is. A container shares the host kernel. gVisor puts a second,
+user-space kernel between the process and the real one. Firecracker gives the process a kernel
+of its own inside a microVM. Each answer costs something different in startup time, syscall
+overhead and memory, and the only honest way to choose is to run the same work on all three.</p>
+
+<p><a href="https://github.com/xiyiji/cordon" target="_blank" rel="noopener">cordon</a> is that
+service, built so the comparison is a table rather than an opinion. One gRPC API for agents
+(<code>Acquire</code>, <code>Exec</code>, <code>Release</code>, or <code>Run</code> for
+one-shot calls), one FastAPI control plane for operators, and behind them a five-method
+runtime contract &mdash; <code>create</code>, <code>exec</code>, <code>destroy</code>,
+<code>snapshot</code>, <code>restore</code> &mdash; that runc, gVisor and Firecracker each
+implement. runc and gVisor share one OCI bundle and differ only in which binary receives it.
+Firecracker boots a VM over its API socket and talks to a small agent inside it over vsock.</p>
+
+<h2>The suite has to be able to say no</h2>
+
+<p>The escape suite is thirteen programs: reach the network, open a raw socket, write outside
+the sandbox, read <code>/etc/shadow</code>, allocate a gigabyte under a 128&nbsp;MB cap, burn
+CPU, sleep forever, fork five hundred times, run three children that each stay under the
+per-process cap but not together, flood stdout, write a 200&nbsp;MB file. Each runs in a fresh
+sandbox, and each has a predicate for what it wanted &mdash; a fork bomb that was refused by the
+pids cgroup exited 1, but so would a fork bomb that ran out of memory on the host, and the table
+has to tell those apart.</p>
+
+<p>There is also a fourth runtime, <code>host</code>, which is not a sandbox at all: rlimits
+and nothing else, so the whole stack runs in CI without privileges. Against it the suite reports
+<b>five of thirteen escaped</b> &mdash; the socket connects, <code>/etc</code> is writable,
+<code>/etc/shadow</code> reads, <code>mount</code> succeeds, and three children under the
+per-process cap happily exceed it together. Against runc: <b>thirteen of thirteen contained</b>,
+each row naming the control that did it &mdash; <em>network</em>, <em>filesystem</em>,
+<em>memory</em>, <em>processes</em>, <em>cpu</em>, <em>file_size</em>, <em>wall_clock</em>. A
+suite that cannot fail a weak runtime cannot be trusted to pass a strong one.</p>
+
+<h2>Naming the refusal</h2>
+
+<p>The result of every command says which control stopped it, and that comes from what the kernel
+counted, not from stderr. An out-of-memory kill shows up as an increment in the cgroup's
+<code>memory.events</code>; a pids-limit hit in <code>pids.events</code>; CPU and file-size
+limits arrive as <code>SIGXCPU</code> and <code>SIGXFSZ</code>. The counters are cumulative for
+the container's life, so each exec reads them before and after and reports the difference &mdash;
+the first version read them once and, after a single OOM, called every later command in that
+sandbox a memory failure.</p>
+
+<h2>A restore instead of a boot</h2>
+
+<p>The number every sandbox platform fights is time to shell: from "give me a sandbox" to "a
+command ran in it". cordon keeps a warm pool per runtime; <code>Acquire</code> takes a ready
+sandbox and a filler thread starts its replacement. For Firecracker the pool boots one golden VM,
+snapshots it, and fills itself by restoring the snapshot &mdash; the per-sandbox cost is a memory
+file load, not a kernel boot. On runc, on the machine this was developed on, a cold start (create
+plus one exec) is <b>70&nbsp;ms at p50</b>; from the pool it is <b>22&nbsp;ms</b>, which is
+almost entirely the exec itself. Twenty idle containers cost 2.5&nbsp;MB each.</p>
+
+<h2>Three things the tests found</h2>
+
+<p><b>A detached container holds the pipes.</b> <code>runc run --detach</code> returns, but the
+container's init inherits whatever stdout and stderr it was given and keeps them open for its
+whole life. Call it with a pipe and wait for EOF and you wait forever. The fix is a file, not a
+pipe, for anything that will outlive the call.</p>
+
+<p><b>Forking inside a gRPC thread aborts.</b> The host runtime set its rlimits in a
+<code>preexec_fn</code>, which forces Python's <code>subprocess</code> down the plain
+<code>fork()</code> path instead of <code>vfork</code>. <code>fork()</code> runs every registered
+atfork handler, and gRPC's handler aborts a child forked from one of its own threads. The limits
+are now applied from the parent with <code>prlimit</code> after spawn, which needs no fork at
+all.</p>
+
+<p><b>Binding the host's <code>/etc</code> read-only still exposes <code>/etc/shadow</code>.</b>
+Read-only means unwritable, not unreadable. In the development mode that borrows the host's
+directories, the secret files are masked with <code>/dev/null</code>; with a real root
+filesystem the file is the image's, not the host's.</p>
+
+<h2>What comes next</h2>
+
+<p>The three-way comparison needs a machine with KVM, which a laptop does not have and most
+cloud VMs do not expose. The repository's Terraform brings up a GCE instance with nested
+virtualization and a cloud-init that installs runc, runsc, Firecracker, a guest kernel and a
+guest root filesystem built from the same image for all three runtimes. Part two is the table
+that comes out of it: time to shell cold, pooled and restored; syscall-heavy and CPU-bound
+work relative to the bare host; memory per sandbox at fifty concurrent.</p>
+
+<div class="src">
+  <b>Code</b>
+  <a href="https://github.com/xiyiji/cordon" target="_blank" rel="noopener">github.com/xiyiji/cordon</a> &mdash;
+  <code>src/cordon/runtimes/</code> holds the three runtimes, <code>escapes/</code> the suite, <code>bench/</code> the driver, <code>infra/terraform/</code> the host.
+</div>
+
+</article>
+
+</div>
+</body>
+</html>
