@@ -18,6 +18,12 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&family=LXGW+WenKai+TC:wght@400;700&display=swap">
 <link rel="stylesheet" href="assets/style.css">
+<style>
+.entryrow{display:flex;gap:20px;align-items:flex-start}
+.entryrow .entrytext{flex:1;min-width:0}
+.entryrow img{width:150px;flex:0 0 auto;border-radius:10px;border:1px solid rgba(124,92,214,.22);display:block}
+@media(max-width:560px){.entryrow{flex-direction:column}.entryrow img{width:100%}}
+</style>
 </head>
 <body>
 
@@ -186,6 +192,17 @@
 <section id="blogs">
   <h2 class="section-title">Blogs</h2>
   <div class="post-list">
+
+    <a class="entry" href="blogs/llm-inference-scheduling.html">
+      <div class="entryrow">
+        <div class="entrytext">
+        <div class="entry-meta">2026.09.10 <span class="dot">/</span> inference · scheduling</div>
+        <div class="entry-title">LLM inference in cards: the map, and scheduling</div>
+        <div class="entry-desc">A card series on where a serving stack actually loses time. The map first — six entry points that combine — then scheduling in detail: batching reuses one read of the weights, continuous batching updates the batch every iteration, and chunked prefill caps what a long prompt can do to everyone else's inter-token latency.</div>
+        </div>
+        <img src="blogs/figures/llm-inference/00-overview.jpg" alt="Six entry points for optimising LLM inference">
+      </div>
+    </a>
 
     <a class="entry" href="blogs/mcp-is-not-dead.html">
       <div class="entry-meta">2026.08.29 <span class="dot">/</span> agents · tooling</div>

@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LLM inference in cards: the map, and scheduling — Mengyun Wang</title>
+<meta name="description" content="A card series on LLM inference optimisation: six places a serving stack can be optimised, then scheduling in detail — batching, continuous batching and chunked prefill.">
+<meta name="author" content="Mengyun Wang">
+<meta name="theme-color" content="#faf9f6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f0f17" media="(prefers-color-scheme: dark)">
+<meta property="og:title" content="LLM inference in cards: the map, and scheduling">
+<meta property="og:description" content="Six places a serving stack can be optimised, then scheduling in detail — batching, continuous batching, chunked prefill, and the three numbers they trade against each other.">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://xiyiji.github.io/blogs/llm-inference-scheduling.html">
+<meta property="og:image" content="https://xiyiji.github.io/blogs/figures/llm-inference/00-overview.jpg">
+<link rel="canonical" href="https://xiyiji.github.io/blogs/llm-inference-scheduling.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#9889;</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="../assets/style.css">
+<style>
+.cardfig{margin:30px 0 34px}
+.cardfig img{width:100%;max-width:620px;display:block;border-radius:14px;
+  border:1px solid rgba(124,92,214,.18);box-shadow:0 2px 18px rgba(36,19,80,.08)}
+.cardfig figcaption{font-size:13.5px;line-height:1.5;color:var(--text-muted);margin-top:10px;max-width:620px}
+.cardgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:22px;margin:26px 0 34px}
+.cardgrid img{width:100%;display:block;border-radius:12px;
+  border:1px solid rgba(124,92,214,.18);box-shadow:0 2px 14px rgba(36,19,80,.07)}
+.cardgrid figcaption{font-size:12.5px;line-height:1.45;color:var(--text-muted);margin-top:8px}
+.cardgrid figure{margin:0}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+<div class="page-head">
+  <a class="backlink" href="./"><span class="arw">←</span> Blogs</a>
+  <h1 style="font-size:clamp(28px,4.6vw,40px)">LLM inference in cards: the map, and scheduling</h1>
+  <p class="page-sub">2026.09.10 &nbsp;·&nbsp; inference · scheduling &nbsp;·&nbsp; card series</p>
+</div>
+
+<article class="post" style="padding-top:34px">
+
+<p>"Make inference faster" is not one problem. A serving stack loses time in six different
+places, and the technique that fixes one of them usually does nothing for the other five. This
+is a card series that goes through them one at a time — what the technique actually changes,
+and which number it moves.</p>
+
+<figure class="cardfig">
+  <img src="figures/llm-inference/00-overview.jpg" alt="Six entry points for optimising LLM inference: scheduling, caching, kernels and execution, quantization, decoding, parallelism and deployment.">
+  <figcaption>The map. Six entry points, grouped by what they primarily change — they combine, and most production stacks use all six.</figcaption>
+</figure>
+
+<h2>02 · Scheduling</h2>
+
+<p>Scheduling is the one that needs no new kernels and no change to the model: it is only a
+decision about which requests run in the same forward pass. It also has the clearest trade —
+batching more requests raises throughput, and the requests already mid-generation pay for it in
+the gap between their tokens.</p>
+
+<p>Three steps, in the order the ideas arrived: batching reuses one read of the weights across
+several requests; continuous batching lets the batch change every iteration instead of every
+request; chunked prefill caps how much prefill any single iteration can contain, so a long
+prompt joining the batch cannot stall everyone else's decode. The three numbers they trade
+against each other are TTFT, ITL and throughput.</p>
+
+<div class="cardgrid">
+  <figure><img src="figures/llm-inference/01-cover.jpg" alt="Series 02: Scheduling — how requests are batched and executed."><figcaption>01 · What scheduling covers</figcaption></figure>
+  <figure><img src="figures/llm-inference/02-prefill-decode.jpg" alt="Prefill and decode explained."><figcaption>02 · Prefill and decode</figcaption></figure>
+  <figure><img src="figures/llm-inference/03-gpu-dataflow.jpg" alt="GPU dataflow: HBM to on-chip storage to compute units; small-batch decode is memory-bandwidth-bound."><figcaption>03 · Why small-batch decode waits on memory</figcaption></figure>
+  <figure><img src="figures/llm-inference/04-batching.jpg" alt="Batching reuses one read of the weights across three requests."><figcaption>04 · Batching reuses the weights</figcaption></figure>
+  <figure><img src="figures/llm-inference/05-continuous-batching.jpg" alt="Static batching versus continuous batching across four iterations."><figcaption>05 · Static vs continuous batching</figcaption></figure>
+  <figure><img src="figures/llm-inference/06-long-prefill.jpg" alt="A long prefill joining a mixed batch widens the decoding request's inter-token latency."><figcaption>06 · What a long prefill costs</figcaption></figure>
+  <figure><img src="figures/llm-inference/07-chunked-prefill.jpg" alt="Chunked prefill: a 24-token prompt split across three iterations under a token budget of nine."><figcaption>07 · Chunked prefill and the token budget</figcaption></figure>
+  <figure><img src="figures/llm-inference/08-summary.jpg" alt="Scheduling summary with TTFT, ITL and throughput."><figcaption>08 · The summary, and the three numbers</figcaption></figure>
+</div>
+
+<h2>What comes next</h2>
+
+<p>The remaining five: caching (the KV cache is a capacity problem, and paging is what stops
+fragmentation from eating the capacity), kernels and execution, quantization, speculative
+decoding, and parallelism with prefill–decode disaggregation — which is the multi-machine
+version of the same fight chunked prefill settles inside one GPU.</p>
+
+<div class="src">
+  <b>Sources</b>
+  Orca (OSDI '22) &mdash; iteration-level scheduling &middot;
+  Sarathi / Sarathi-Serve (OSDI '24) &mdash; chunked prefill and mixed batching &middot;
+  vLLM optimization and tuning docs &middot;
+  NVIDIA GPU performance and matrix-multiplication guides &middot;
+  How To Scale Your Model.
+</div>
+
+</article>
+
+</div>
+</body>
+</html>
