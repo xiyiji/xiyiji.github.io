@@ -68,6 +68,14 @@
   <div class="news">
     <div class="news-item">
       <span class="news-date">2026.09</span>
+      <span class="news-body">Published a two-layer LLM inference stack:
+      <b><a href="https://github.com/xiyiji/llm-serving-platform">LLM Serving Platform</a></b>
+      for the control plane and
+      <b><a href="https://github.com/xiyiji/InferenceGateway">InferenceGateway</a></b>
+      for Ray Serve + vLLM GPU execution.</span>
+    </div>
+    <div class="news-item">
+      <span class="news-date">2026.09</span>
       <span class="news-body">Built <b><a href="https://github.com/xiyiji/atlas-llm-execution-agent">Atlas</a></b> —
       a five-agent committee with a human approval gate, durable state, and a live event stream.
       <a href="projects/atlas-demo.html">Try the demo →</a></span>
@@ -115,19 +123,36 @@
       </div>
     </a>
 
-    <a class="entry" href="https://llm-serving-platform.vercel.app" target="_blank" rel="noopener">
+    <a class="entry" href="https://github.com/xiyiji/llm-serving-platform" target="_blank" rel="noopener">
       <div class="entry-title">LLM Serving Platform</div>
-      <div class="entry-meta">Inference gateway &amp; ops console &nbsp;&middot;&nbsp; FastAPI &middot; Next.js &middot; K8s</div>
-      <div class="entry-desc">A self-hosted serving layer for LLM inference: an OpenAI-compatible
-      gateway with SSE streaming, latency-aware routing, dynamic micro-batching, prefix caching,
-      warm-pool cold-start management, and canary releases that roll back automatically on
-      error-rate breach &mdash; plus an admin console reading live platform state. Pairs with
-      InferenceGateway (Ray Serve + vLLM) as the engine layer beneath it.</div>
+      <div class="entry-meta">LLM control plane &nbsp;&middot;&nbsp; FastAPI &middot; Next.js &middot; OpenTelemetry &middot; Kubernetes</div>
+      <div class="entry-desc">An OpenAI-compatible gateway and operations layer for model engines.
+      Requests move through authentication, rate limiting, a prefix-response cache, warm-pool
+      coordination, adaptive backend routing, and dynamic micro-batching before reaching an
+      upstream engine. The console exposes chat, routing health, cache and batch state, model
+      governance, and canary, rolling, and blue-green release controls.</div>
       <div class="entry-tags">
-        <span class="tag"><b>94.7%</b> cache hits</span>
+        <span class="tag"><b>38</b> tests &middot; CI</span>
+        <span class="tag"><b>94.7%</b> simulated cache hits</span>
+        <span class="tag">W3C <b>trace propagation</b></span>
         <span class="tag">canary <b>auto-rollback</b></span>
-        <span class="tag"><b>27</b> tests &middot; CI</span>
-        <span class="tag live">live</span>
+      </div>
+    </a>
+
+    <a class="entry" href="https://github.com/xiyiji/InferenceGateway" target="_blank" rel="noopener">
+      <div class="entry-title">InferenceGateway</div>
+      <div class="entry-meta">GPU inference data plane &nbsp;&middot;&nbsp; Ray Serve &middot; vLLM &middot; CUDA &middot; DCGM</div>
+      <div class="entry-desc">The engine layer beneath the serving platform: Ray Serve ingress
+      drives vLLM&rsquo;s AsyncLLMEngine with continuous batching, PagedAttention, prefix KV caching,
+      bounded request concurrency, and OpenAI-compatible SSE. A Hugging Face baseline and async
+      load generator measure TTFT, tail latency, tokens per second, and goodput; Prometheus reads
+      vLLM and NVIDIA DCGM metrics for GPU and cache visibility.</div>
+      <div class="entry-tags">
+        <span class="tag">Qwen2.5 <b>7B</b></span>
+        <span class="tag"><b>continuous</b> batching</span>
+        <span class="tag">TTFT &middot; TPOT &middot; <b>goodput</b></span>
+        <span class="tag"><b>GPU</b> telemetry</span>
+        <span class="tag"><b>3</b> contract tests &middot; CI</span>
       </div>
     </a>
 
