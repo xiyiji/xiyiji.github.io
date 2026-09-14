@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Building an LLM serving platform, from the browser to the GPU — Mengyun Wang</title>
+<meta name="description" content="Building a GPU-backed serving platform with FastAPI, Ray Serve and vLLM: architecture, deployment, streaming, controlled experiments, and the decisions behind the implementation.">
+<meta name="author" content="Mengyun Wang">
+<meta property="og:title" content="Building an LLM serving platform, from the browser to the GPU">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://xiyiji.github.io/blogs/building-llm-serving-platform.html">
+<link rel="canonical" href="https://xiyiji.github.io/blogs/building-llm-serving-platform.html">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="../assets/style.css">
+<style>.post table{width:100%;border-collapse:collapse;font-size:.9em}.post th,.post td{text-align:left;padding:10px;border-bottom:1px solid #aaa5}.table-scroll{overflow-x:auto}.post pre{overflow-x:auto;padding:18px;background:#8881;border-radius:8px}.status-note{padding:16px;border-left:3px solid #8974b6;background:#8974b60c}</style>
+</head>
+<body><div class="wrap">
+<div class="page-head">
+<a class="backlink" href="./"><span class="arw">←</span> Blogs</a>
+<h1 style="font-size:clamp(28px,4.6vw,40px)">Building an LLM serving platform, from the browser to the GPU</h1>
+<p class="page-sub">2026.09.13 · inference · systems · project notes</p>
+</div>
+<article class="post" style="padding-top:34px">
+<p>I wanted to understand what happens behind an AI application after someone clicks Send.</p>
+<p>The interface makes it look simple: a question goes in, and an answer streams back. Behind that interaction, though, requests pass through services, wait for execution, and compete for GPU memory. A model that answers one person does not automatically become a useful service for several people.</p>
+<p>That was the starting point for this project. I built a GPU-backed LLM serving platform across the application, serving, and measurement layers: a web console, an OpenAI-compatible gateway, a Ray Serve application running vLLM, and a separate framework for controlled scheduling experiments on an RTX 4090.</p>
+<p>It became a much larger project than a model endpoint. Some sessions were about architecture and API contracts. Others were spent looking at an empty listening-port list, waiting for model initialization, or working out whether a benchmark was measuring what its label claimed. Bringing those pieces together was tiring, occasionally frustrating, and genuinely satisfying.</p>
+<p class="status-note">This is a record of the implemented platform and the completed scheduler measurements, not a claim of production-scale operation. At publication, final public-service restoration and video handoff are still being checked. The original InferenceGateway specification also has a separate HF-versus-vLLM comparison that remains outstanding.</p>
+
+<h2>A platform with a real request path</h2>
+<p>I organized the work into three repositories. <a href="https://github.com/xiyiji/llm-serving-platform">LLM Serving Platform</a> contains the gateway and operations console. <a href="https://github.com/xiyiji/InferenceGateway">InferenceGateway</a> connects Ray Serve to the GPU inference engine. <a href="https://github.com/xiyiji/slo-aware-vllm">SLO-aware vLLM</a> contains the controlled experiments and their evidence.</p>
+<pre>Next.js browser interface
+        ↓ HTTP / streamed responses
+FastAPI gateway on Render
+        ↓ OpenAI-compatible upstream requests
+Ray Serve application on RunPod
+        ↓ asynchronous generation
+vLLM → Qwen2.5-7B-Instruct → RTX 4090</pre>
+<p>The gateway handles application concerns such as request validation, routing, response caching, and streaming. The GPU service handles model execution. Keeping those responsibilities separate made it possible to work on the interface and gateway without repeatedly loading a model, then connect the same application path to real GPU inference.</p>
+<p>The project includes a simulator for development. That is useful, but its results need their own label. A cached response from a simulated engine says something about gateway behavior; it does not establish GPU throughput. I became much more careful about keeping those two kinds of evidence separate.</p>
+
+<h2>Why Ray Serve and vLLM are both there</h2>
+<p>Ray Serve is the application-serving layer in this setup. My deployment wraps a FastAPI application, reserves one GPU through its actor resource configuration, and initializes the model engine inside the replica. It exposes health and chat-completion endpoints. The current configuration uses one replica on one GPU, not a demonstrated multi-node deployment.</p>
+<p>vLLM is the inference engine. I use its asynchronous generation interface, turn generated text into incremental response events, and return those events through the API. Its scheduling and attention-memory machinery are existing capabilities I integrate, not algorithms I wrote.</p>
+<p>For this single-GPU setup, a standalone vLLM server would also be reasonable. Ray Serve gives the application a deployment abstraction, but it adds another process and configuration boundary to understand. I did not want to justify it by claiming it automatically makes the model faster. Its <a href="https://docs.ray.io/en/latest/serve/configure-serve-deployment.html">deployment and concurrency controls</a> solve a different problem from token-level scheduling.</p>
+<p>That distinction later affected the experiment design: I benchmarked the vLLM server directly inside the GPU environment. Ray Serve remained part of the application architecture, but was not another variable in an experiment intended to measure engine settings.</p>
+
+<h2>Two kinds of batching, two different responsibilities</h2>
+<p>The gateway has request micro-batching: it can group nearby arrivals before dispatch. That is application-level coordination. It does not, by itself, combine their computation into an efficient GPU execution step.</p>
+<p>Continuous batching happens inside the engine. Requests finish at different times, and the active set can change as generation progresses. This is different from waiting for an entire fixed group to finish before admitting more work.</p>
+<p>The difference sounds small until someone asks what an optimization actually changed. Sending several asynchronous HTTP requests is not enough evidence that GPU execution improved. An extra waiting window at the gateway can even add latency without providing a benefit downstream.</p>
+<p>I found the same naming problem with caching. A response cache can avoid generation by returning an existing answer. The GPU KV cache stores attention-related intermediate state used during generation. Prefix reuse is another mechanism again. They can all affect latency, but they do not justify the same claim.</p>
+<p>Being precise about these boundaries helped me understand the system better. It also made the documentation more useful: a reader should not need to inspect every implementation detail to discover which layer owns a capability.</p>
+
+<h2>Deployment became a lesson in readiness</h2>
+<p>The cloud deployment involved more than starting a container. I encountered unavailable GPU capacity after a stopped Pod, replacement environments, missing commands in the active environment, and an application that was not listening on the expected inference port.</p>
+<p>One particularly confusing moment was seeing the Pod marked Running while a request to the local inference endpoint failed immediately. The infrastructure was available; the application was not. Later, a Ray proxy could be running without a ready model deployment behind it.</p>
+<p>I started testing from the inside outward: local model request, public GPU endpoint, Render gateway, then browser. This made each failure smaller. Instead of asking why the website did not work, I could ask whether a particular boundary accepted a particular request.</p>
+<p>Model startup also had its own timeline: loading weights, preparing memory, compilation, and warmup. A quiet terminal was not always a hung process. Restarting without checking could throw away progress and repeat the expensive part.</p>
+<p>These are not glamorous problems, but they changed how I interpreted health checks. A service being alive, a model being ready, and an end-to-end request succeeding are separate facts. My interface now avoids presenting gateway health as proof that the GPU is available.</p>
+
+<h2>Streaming is a contract, not just moving text</h2>
+<p>Streaming made the application feel responsive, but it also created more states to handle. A response can start and then fail. A client can leave before generation finishes. A final event can contain usage statistics without another piece of text.</p>
+<p>I worked on the behavior around those boundaries: incomplete streams must not silently become successful responses, partial answers must not be treated as complete cache entries, and generation should be aborted when its consumer is gone. The upstream adapter also needs to accept usage-only events rather than assuming every event contains a text choice.</p>
+<p>The most consequential measurement issue came from the same boundary. The benchmark had treated an SSE event as one token. But SSE is a transport format, not a tokenizer. A chunk can contain multiple tokens or metadata.</p>
+<p>I changed the accounting to use actual engine token counts. The benchmark checks completion, usage, and expected output length. Its timing contract distinguishes first visible content from stream metadata. Client-observed average time per output token remains a proxy, not a claim to measure every individual GPU token event.</p>
+<p>This work was less visible than the chat interface, but it determined whether the later performance tables could be trusted.</p>
+
+<h2>Turning the GPU into a controlled experiment</h2>
+<p>The next question was concrete: on the same model and GPU, could a different scheduler configuration serve the workload better?</p>
+<p>I varied the sequence limit and token budget, using Qwen2.5-7B-Instruct on one RTX 4090. The workload used fixed-length synthetic inputs of 256 tokens and outputs of 128 tokens. Prefix caching was disabled. Warmup was separated from measurement, and the formal comparisons used three paired workload seeds with 128 requests per run.</p>
+<p>Requests followed seeded open-loop arrivals at a nominal two requests per second. Unlike a client that waits for a reply before sending another request, this allows offered work to continue arriving when the server slows down. That exposes queueing rather than quietly reducing the load. I also recorded dispatch lateness so a slow load generator would not go unnoticed.</p>
+<p>The experiment tracks output throughput, first-token and total latency, errors, goodput, and sampled GPU and engine telemetry. Goodput counts successful requests that meet both declared targets: first content within one second and completion within ten seconds. Those are targets for this study, not universal product requirements.</p>
+<p>The token budget matters because prompt processing and ongoing generation share scheduling capacity. vLLM's <a href="https://docs.vllm.ai/en/latest/configuration/optimization/">chunked-prefill and tuning documentation</a> explains how prompt work can be split and combined with decoding. I used those controls as experiment variables; I did not change the model or implement a new scheduler.</p>
+
+<h2>The result changed the deployment decision</h2>
+<p>The study produced 16 completed runs, including nine formal runs. Screening selected eight sequences with a 2,048-token budget. Formal validation compared that candidate against a serial-sequence reference and a 128-sequence, 4,096-token reference representing the existing-style batched setting.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>Configuration</th><th>Mean output tokens/s</th><th>Mean good requests/s</th><th>Mean of run-level p95 TTFT</th></tr></thead>
+<tbody><tr><td>Serial reference: 1 / 4096</td><td>40.47</td><td>0.008</td><td>55.422 s</td></tr>
+<tr><td>Screening candidate: 8 / 2048</td><td>265.41</td><td>1.999</td><td>0.539 s</td></tr>
+<tr><td>Batched reference: 128 / 4096</td><td>265.38</td><td>2.073</td><td>0.073 s</td></tr></tbody>
+</table></div>
+<p>These are arithmetic means of three runs, not a pooled percentile or a statistical significance claim. The full <a href="https://github.com/xiyiji/slo-aware-vllm/blob/main/results/REPORT.md">per-run results</a> include the raw records, manifests, and comparison plot.</p>
+<p>The candidate and batched reference had essentially identical output throughput. But in one paired repeat, the candidate's p95 first-token latency reached 1.464 seconds, compared with about 0.076 seconds for the reference. Its goodput was lower. I therefore have no basis to promote the screening candidate as an upgrade.</p>
+<p>The serial reference was overloaded, with 270 timeouts across 384 attempts. Comparing against it produces a large throughput difference, but that would not establish an improvement over my already batched application. Successful output throughput during a deadline-limited overloaded run is also not an unrestricted engine-capacity measurement.</p>
+<p>The practical conclusion is to retain the 128-sequence reference for this tested workload. The smaller candidate looked adequate during screening but did not justify replacing it after repeated comparison. That is a useful configuration decision, even though it is not the improvement percentage I initially hoped to report.</p>
+<p>There are limits: short synthetic prompts, one model, one GPU, three repetitions, and grouped execution order to reduce rented-GPU startup cost. The experiment does not determine the best setting for long documents, different arrival rates, or mixed production traffic.</p>
+
+<h2>Making the platform understandable to someone else</h2>
+<p>I also simplified the frontend because the original console exposed too much at once. I could recognize the individual controls and still find the overall page difficult to use.</p>
+<p>The revised interface puts chat first, offers example prompts, and folds advanced configuration away until needed. Admin separates model operations from diagnostics and provides clearer status feedback. I removed misleading live-looking charts rather than use visual complexity to imply observability.</p>
+<p>Register, promote, load, and unload are available in the interface, but their scope matters. Promotion updates registry stage information. Load and unload operate on the gateway warm pool; they do not directly allocate or release model weights on the GPU.</p>
+<p>I considered connecting those controls to full deployment management with health gates, canary traffic, rollback, and durable audit records. That is a substantial next project, especially when two model versions may compete for a single GPU. I decided not to add it to the current scope. Finishing the evidence and making the existing platform usable was a better use of the available time and budget.</p>
+
+<h2>Where this connects to real business problems</h2>
+<p>This is a personal single-GPU project, not a large-company production deployment. The connection to business systems is in the decisions it makes visible.</p>
+<p>For a customer-support assistant, the time before the first useful response and the reliability of completion matter more than a busy GPU. For an internal document-processing job, throughput and deadline completion may matter more than immediate first-token latency. Those products can require different scheduling choices even when they share the same model.</p>
+<p>For a shared model platform, an API boundary lets application teams consume inference without each team operating a model process. But that platform also needs explicit queueing, isolation, and failure behavior. Accepting unlimited work is not the same as providing useful capacity.</p>
+<p>The economic question I would eventually want to answer is cost per useful completed request. That requires the rental cost, idle time, failed requests, workload mix, and latency targets, not merely peak tokens per second. I have not demonstrated a production cost saving here. I have built part of the measurement needed to investigate one responsibly.</p>
+<p>The experiment also illustrates the value of not deploying a change. If a candidate provides no throughput benefit and worse latency behavior under the tested conditions, keeping the existing configuration avoids introducing an unsupported change.</p>
+
+<h2>What I take away from building it</h2>
+<p>I am proud of the breadth of this project. It connects a usable interface, asynchronous APIs, cloud networking, GPU model execution, observability hooks, infrastructure definitions, automated checks, and a reproducible experiment framework. It gave me a reason to work across layers rather than stop at a notebook or a standalone endpoint.</p>
+<p>At the beginning, I spent more time thinking about which components to include. Over time, I paid more attention to what each component actually controlled and what evidence would establish that it worked. That made my decisions more specific: which endpoint to test, which timing to measure, which setting to keep, and which feature to defer.</p>
+<p>A review also pointed out a real gap: the original InferenceGateway specification called for HF-versus-vLLM tables at concurrency 1, 4, and 16. The scheduler study does not replace that comparison. I now keep service validation, engine experiments, and original acceptance criteria separate in the handoff rather than collapse them into one completion claim.</p>
+<p>The same applies to infrastructure and observability. Terraform validation is not an actual EKS deployment. Trace instrumentation without a configured collector is not a remotely observed tracing system. A recorded demo is not an uptime commitment. These distinctions help someone else understand what they can rely on.</p>
+<p>This project took a lot of back-and-forth. There were moments when I wanted to stop looking at terminals and just see the answer arrive in the browser. But working through the application, deployment, and measurement details gave me a much more concrete understanding of inference infrastructure.</p>
+<p>I now have a system I can inspect layer by layer, an experiment whose conclusions I can trace to individual requests, and a clearer sense of what to build next. That feels like a worthwhile outcome for the effort it took.</p>
+<div class="src"><b>Implementation and evidence</b><br>
+<a href="https://github.com/xiyiji/llm-serving-platform">Gateway and console</a> · <a href="https://github.com/xiyiji/InferenceGateway">Ray Serve / vLLM integration</a> · <a href="https://github.com/xiyiji/slo-aware-vllm">Experiment repository</a> · <a href="https://github.com/xiyiji/slo-aware-vllm/blob/main/docs/DESIGN.md">Design and measurement contract</a> · <a href="https://github.com/xiyiji/slo-aware-vllm/blob/main/results/REPORT.md">Raw-backed result tables</a><br>
+Published as an implementation account with explicit acceptance boundaries. Operational availability can change when the rented GPU is stopped.</div>
+</article></div></body></html>
