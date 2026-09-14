@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The offline–online gap is well measured. Its causes aren't. — Mengyun Wang</title>
+<meta name="description" content="Offline metrics and A/B results disagree often enough that Booking.com measured a correlation of −0.10 between them. The literature quantifies the gap in detail; the studies I found never say how often each cause is to blame. What one experiment adds, and what it can't.">
+<meta name="author" content="Mengyun Wang">
+<meta name="theme-color" content="#faf9f6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f0f17" media="(prefers-color-scheme: dark)">
+<meta property="og:title" content="The offline–online gap is well measured. Its causes aren't.">
+<meta property="og:description" content="The offline–online gap in recommender evaluation is well quantified. Its causes, as far as I can find, are not. Notes from one experiment and a week of reading.">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://xiyiji.github.io/blogs/offline-online-gap.html">
+<link rel="canonical" href="https://xiyiji.github.io/blogs/offline-online-gap.html">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#127919;</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="../assets/style.css">
+<style>
+.post table{border-collapse:collapse;width:100%;font-size:14.5px;margin:18px 0 26px}
+.post th,.post td{padding:9px 12px;text-align:left;border-bottom:1px solid rgba(124,92,214,.18);vertical-align:top}
+.post th{font-weight:600;color:var(--text-muted);font-size:13px}
+.post td.n{font-family:"JetBrains Mono",monospace;white-space:nowrap}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+<div class="page-head">
+  <a class="backlink" href="./"><span class="arw">←</span> Blogs</a>
+  <h1 style="font-size:clamp(28px,4.6vw,40px)">The offline–online gap is well measured. Its causes aren't.</h1>
+  <p class="page-sub">2026.09.14 &nbsp;·&nbsp; evaluation · recommenders &nbsp;·&nbsp; notes</p>
+</div>
+
+<article class="post" style="padding-top:34px">
+
+<p>When a model looks better offline and the A/B test says otherwise, you'll often hear:
+"it's usually not the model." I've said it myself. It sounds right, and it's a comfortable
+thing to say because it points at the data and the logging instead of at the modelling. But
+"usually" is a claim about how often something happens. You'd need a base rate to back it. I
+had one experiment on this and wanted to know if that base rate exists anywhere. So I went and
+looked. Here's what the experiment showed, what the papers have actually measured, and the one
+thing I couldn't find anyone measuring.</p>
+
+<h2>What my one experiment showed</h2>
+
+<p>The experiment is <a href="https://rankshift-nine.vercel.app/">RankShift</a>. It uses
+KuaiRand, a Kuaishou dataset with something you almost never get: for two weeks the app slipped
+uniformly random videos into real feeds. So there's a test set where what people saw didn't
+depend on the recommender. I trained a LightGBM ranker on the normal logs and tested it on
+both kinds of exposure over the same two weeks.</p>
+
+<p>Three things came out. Ranking held up. Lift at the top 23.9% of traffic went from 3.43×
+under normal exposure to 3.36× under random — down 2%. Calibration didn't hold up at all.
+Predicted probability over actual rate went from 0.96× to 2.07×. When I fitted a calibrator
+on the random slice, it fixed that slice and broke the normal one by about the same factor the
+other way. And the standard off-policy estimators — IPS, self-normalized IPS, a direct reward
+model, doubly robust — all missed the random slice's true value by 3 to 3.9× when I gave them
+item-level propensities. The confidence intervals were tight, so that's bias, not noise. Flip the
+direction, use exact propensities, and you still only recover a third of the policy's value. The
+other two-thirds is which user gets which video, and item-level propensities can't see that. All
+of it held at 322 million interactions.</p>
+
+<p>Now the limits, because they matter. One dataset. One platform. Two weeks. One model, one
+seed. The features include watch time, which you only have after someone was shown the video —
+in a real pre-impression ranker every number above would drop. And the shift I studied, normal
+to uniformly random, is a stress test, not what a typical product change looks like. What the
+experiment tells you is how big one mechanism can get. It tells you nothing about how often that
+mechanism is the one biting you.</p>
+
+<h2>What the papers have measured</h2>
+
+<p>The gap itself is measured well. Here are the numbers I found.</p>
+
+<table>
+<tr><th>Study</th><th>What was compared</th><th>Result</th></tr>
+<tr><td>Booking.com, KDD 2019</td><td>Offline gain vs. RCT business gain across 23 model pairs</td><td class="n">Pearson −0.10, Spearman −0.18</td></tr>
+<tr><td>Criteo, WSDM 2018</td><td>Off-policy estimate vs. outcome of 39 real A/B tests</td><td class="n">best estimator: precision 0.56</td></tr>
+<tr><td>Spotify, WSDM 2019</td><td>Offline vs. online ranking of 12 systems, by estimator</td><td class="n">Kendall τ 0.33 (n.s.) to 0.64</td></tr>
+<tr><td>swissinfo.ch, RecSys 2014</td><td>Offline replay vs. three-week live test</td><td>most-popular best offline, worst online</td></tr>
+<tr><td>Docear, TPDL 2015</td><td>Offline metrics vs. clicks vs. user ratings</td><td class="n">offline–rating r 0.52–0.67</td></tr>
+</table>
+
+<p>Booking's authors call offline metrics "only a health check." The Spotify result is the one
+that stuck with me: same twelve systems, and whether offline agrees with the A/B depends on how
+you set up the estimator. You can get no correlation or a significant one from the same logs.
+So part of the gap is how the offline number was computed. Not all of it is the world.</p>
+
+<p>The causes people have demonstrated fall into four places. Each one has at least one real
+measurement behind it.</p>
+
+<p><strong>The log.</strong> Offline data comes from whatever policy produced it. Cañamares and
+Castells showed that plain popularity beats collaborative filtering on MovieLens and Netflix
+under the usual held-out evaluation, and the winner flips once you collect test data
+missing-at-random. Schnabel et al. proved the bias of importance-weighted estimators scales
+with how wrong your propensities are. Dudík, Langford and Li proved doubly robust's bias is the
+<em>product</em> of reward-model error and propensity error. Get either one right and you're
+fine; get both wrong and you inherit both. And here's the part I hadn't appreciated: the two
+best real-log benchmarks for these estimators, Open Bandit and Bottou's Bing work, both used
+propensities logged at serving time. Their good results don't carry over to the situation most
+teams are in, where you estimate propensities afterwards. That's the situation my experiment
+was in. The estimators failed there, and the theorems say why.</p>
+
+<p><strong>The probabilities.</strong> Ranking and calibration come apart. Temperature scaling
+doesn't move the argmax (Guo et al.), and Facebook's ads team wrote back in 2014 that a single
+global multiplier fixes a 2× over-prediction without touching AUC. Ovadia et al. tested
+calibration under distribution shift on Criteo ad clicks and found that a calibrator fitted on
+the validation set made things worse than doing nothing. Google's ads team said in 2013 that
+the feedback loop between model and traffic makes calibration guarantees impossible in
+principle. A 2023 ICLR paper gives the mechanism: any policy that serves its top-scored items
+is selecting on the lucky side of its own errors, so served traffic looks over-predicted even
+when the model has no bias. My 0.96× → 2.07× is one instance of that. I looked for a
+published production A/B where AUC held and calibration broke, with numbers. I didn't find one.
+The closest are a worked example and a synthetic shift.</p>
+
+<p><strong>The plumbing.</strong> Google's ML Test Score calls the training/serving skew check
+"the most important and least implemented." When the Play store's data validation caught
+features that were always there in training and always missing in serving logs, fixing that was
+worth 2% on install rate in an A/B. The model was fine. Its inputs weren't. Chapelle measured
+that on Criteo half the conversions show up more than 24 hours after the click, so a model that
+treats unconverted clicks as negatives underpredicts by 21% while its offline loss looks
+normal. Ji et al. found 54% of recent RecSys papers use random splits. Those leak the future
+into training and swing HR@20 anywhere from −35% to +89% depending on the model — and they
+reorder the models. Krichene and Rendle showed sampled metrics can flip which algorithm wins,
+even in expectation.</p>
+
+<p><strong>The online number.</strong> Kohavi's team at Bing found that 67% of day-one
+treatment effects land outside the final confidence interval, and that most suspected novelty
+effects are just noise. Sometimes offline was right and the A/B hadn't finished yet.</p>
+
+<h2>What I couldn't find</h2>
+
+<p>All of those studies measure the gap. None of them measure the causes. Booking lists four
+mechanisms for its 23 cases and doesn't say how many fall under each. Criteo blames estimator
+bias and variance without splitting them. Garcin, Beel and Rossetti report reversals and call
+their explanations speculation. I went looking for one sentence of the form "X percent of
+offline–online gaps come from Y". I checked those papers, the Chen et al. bias survey, and the
+industry write-ups I could reach. Nothing. That's a bounded search, not proof it doesn't exist.
+But I looked.</p>
+
+<p>I don't think it's laziness. The causes stack. A random split leaks the future, the leaked
+data is exposure-biased, and the serving features don't match training — all on the same model
+at once. When the A/B disappoints, you find the cause you went looking for and stop. To actually
+apportion a gap you'd need to rule out the others, and that takes the exploration slice, the
+logged propensities and the skew monitoring that Google's own rubric says almost nobody
+implements. Not having those is a big part of why the gap exists. And post-mortems mostly don't
+get published. So "it's usually X" is, on everything I can find, a guess. Maybe a good one. Still
+a guess, whoever's saying it.</p>
+
+<h2>So what do you do</h2>
+
+<p>If you can't know the cause in general, you can still order the checks by how much they
+cost. That's the version of the advice I'd stand behind now. Run an A/A and let the test run
+long enough, because the online number might be noise. Join the features you logged at serving
+against the ones you trained on, because skew is cheap to catch and Google keeps finding it.
+Look at whether it's the ranking metrics or the probabilities that disagree, because those break
+for different reasons and only one of them is fixed by recalibrating. Check the split and the
+metric: random or by time, sampled or exact. Then, last, the exposure question, because it's the
+expensive one.</p>
+
+<p>The one structural change is to make the next gap explainable. Log the propensity when you
+serve — it's one field in the request log — and keep a small slice of randomized exposure
+running all the time. With those two, every estimator in the table above becomes usable and
+every future gap can be attributed. Without them you're stuck where the field is now: a list
+of plausible mechanisms and a shrug.</p>
+
+<h2>What I'd run next</h2>
+
+<p>Three things this experiment left hanging. Rerun the estimator comparison with
+user-conditional propensities, which KuaiRand's per-user random slice makes possible, and see
+if the missing two-thirds closes. Drop watch time and redo the transfer test as a real
+pre-impression problem — I expect the ranking result to get weaker and want to know by how much.
+And take the same decomposition to Open Bandit, where propensities are logged, so the answer can
+be checked. None of that turns one experiment into a base rate. It turns one measurement into
+three.</p>
+
+<div class="src">
+  <b>Sources</b>
+  Bernardi, Mavridis, Estevez &mdash; 150 Successful ML Models (KDD 2019) &middot;
+  Gilotte et al. &mdash; Offline A/B Testing for Recommender Systems (WSDM 2018, <a href="https://arxiv.org/abs/1801.07030">arXiv:1801.07030</a>) &middot;
+  Gruson et al. &mdash; Offline Evaluation to Make Decisions about Playlist Recommendation (WSDM 2019) &middot;
+  Garcin et al. &mdash; Offline and Online Evaluation of News Recommenders at swissinfo.ch (RecSys 2014) &middot;
+  Beel &amp; Langer &mdash; Offline Evaluations, Online Evaluations and User Studies (TPDL 2015) &middot;
+  Ca&ntilde;amares &amp; Castells &mdash; Should I Follow the Crowd? (SIGIR 2018) &middot;
+  Schnabel et al. &mdash; Recommendations as Treatments (ICML 2016, <a href="https://arxiv.org/abs/1602.05352">arXiv:1602.05352</a>) &middot;
+  Dud&iacute;k, Langford, Li &mdash; Doubly Robust Policy Evaluation (ICML 2011, <a href="https://arxiv.org/abs/1103.4601">arXiv:1103.4601</a>) &middot;
+  Saito et al. &mdash; Open Bandit Dataset and Pipeline (NeurIPS 2021, <a href="https://arxiv.org/abs/2008.07146">arXiv:2008.07146</a>) &middot;
+  Bottou et al. &mdash; Counterfactual Reasoning and Learning Systems (JMLR 2013) &middot;
+  Guo et al. &mdash; On Calibration of Modern Neural Networks (ICML 2017, <a href="https://arxiv.org/abs/1706.04599">arXiv:1706.04599</a>) &middot;
+  He et al. &mdash; Practical Lessons from Predicting Clicks on Ads at Facebook (ADKDD 2014) &middot;
+  McMahan et al. &mdash; Ad Click Prediction: a View from the Trenches (KDD 2013) &middot;
+  Ovadia et al. &mdash; Can You Trust Your Model's Uncertainty? (NeurIPS 2019, <a href="https://arxiv.org/abs/1906.02530">arXiv:1906.02530</a>) &middot;
+  Fan, Si, Zhang &mdash; Calibration Matters: Tackling Maximization Bias (ICLR 2023, <a href="https://arxiv.org/abs/2205.09809">arXiv:2205.09809</a>) &middot;
+  Breck et al. &mdash; The ML Test Score (IEEE Big Data 2017) &middot;
+  Breck, Polyzotis et al. &mdash; Data Validation for Machine Learning (MLSys 2019) &middot;
+  Chapelle &mdash; Modeling Delayed Feedback in Display Advertising (KDD 2014) &middot;
+  Ji et al. &mdash; A Critical Study on Data Leakage in Recommender System Offline Evaluation (TOIS 2023, <a href="https://arxiv.org/abs/2010.11060">arXiv:2010.11060</a>) &middot;
+  Krichene &amp; Rendle &mdash; On Sampled Metrics for Item Recommendation (KDD 2020, <a href="https://arxiv.org/abs/1912.02263">arXiv:1912.02263</a>) &middot;
+  Kohavi et al. &mdash; Trustworthy Online Controlled Experiments: Five Puzzling Outcomes Explained (KDD 2012) &middot;
+  Gao et al. &mdash; KuaiRand (CIKM 2022, <a href="https://arxiv.org/abs/2208.08696">arXiv:2208.08696</a>).
+  The experiment: <a href="https://github.com/PSCRedefine/rankshift">PSCRedefine/rankshift</a>, every figure from a committed <code>results/*.json</code>.
+</div>
+
+</article>
+
+</div>
+</body>
+</html>
